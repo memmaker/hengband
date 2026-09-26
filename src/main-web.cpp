@@ -13,12 +13,15 @@
 #ifdef USE_WEB
 
 #include "cmd-visual/cmd-draw.h"
+#include "core/visuals-reseter.h"
+#include "game-option/runtime-arguments.h"
 #include "game-option/special-options.h"
 #include "io/input-key-acceptor.h"
 #include "main/sound-definitions-table.h"
 #include "system/angband.h"
 #include "system/floor/floor-info.h"
 #include "system/player-type-definition.h"
+#include "system/system-variables.h"
 #include "term/gameterm.h"
 #include "term/term-color-types.h"
 #include "term/z-term.h"
@@ -45,6 +48,12 @@ EM_JS(void, js_text, (int t, int x, int y, int n, int a, const char *s), { Modul
 EM_JS(void, js_wipe, (int t, int x, int y, int n), { Module.qb.wipe(t, x, y, n); });
 EM_JS(void, js_clear, (int t), { Module.qb.clear(t); });
 EM_JS(void, js_curs, (int t, int x, int y, int w), { Module.qb.curs(t, x, y, w); });
+/* big = 1 in big-tile mode: the tile covers this cell and the next one */
+EM_JS(void, js_pict, (int t, int x, int y, int n, const TERM_COLOR *ap, const char *cp, const TERM_COLOR *tap, const char *tcp, int big),
+    { Module.qb.pict(t, x, y, n, ap, cp, tap, tcp, big); });
+/* Tiles (1) or text (0) as the page's Tiles button says; switch: -1 = no change */
+EM_JS(int, js_tiles_wanted, (void), { return Module.qb.tilesWanted(); });
+EM_JS(int, js_tiles_switch, (void), { return Module.qb.tilesSwitch(); });
 EM_JS(void, js_fresh, (int t), { Module.qb.fresh(t); });
 EM_JS(void, js_bell, (void), { Module.qb.bell(); });
 EM_JS(void, js_sound, (const char *name), { Module.qb.sound(UTF8ToString(name)); });
@@ -138,6 +147,8 @@ static void web_keypress(int k)
     }
 }
 
+static void web_switch_graphics(bool on);
+
 static bool web_pump()
 {
     auto got = false;
@@ -153,6 +164,15 @@ static bool web_pump()
             web_keypress(k);
         }
         got = true;
+    }
+
+    /* Tiles <-> text: only while waiting for a command */
+    if (web_at_prompt() && !got) {
+        const auto on = js_tiles_switch();
+        if ((on >= 0) && ((on != 0) != use_graphics)) {
+            web_switch_graphics(on != 0);
+            got = true;
+        }
     }
 
     /* Safe autosave: only while waiting for a command */
@@ -280,6 +300,36 @@ static errr term_text_web(TERM_LEN x, TERM_LEN y, int n, TERM_COLOR a, concptr s
     return 0;
 }
 
+static errr term_pict_web(TERM_LEN x, TERM_LEN y, int n, const TERM_COLOR *ap, concptr cp, const TERM_COLOR *tap, concptr tcp)
+{
+    /* A map tile in big-tile mode: the next cell holds the pad (AF_BIGTILE2) */
+    const auto &scr = game_term->scr;
+    const auto big = use_bigtile && (x + 1 < game_term->wid) && (scr->a[y][x + 1] == 0xF0) && (static_cast<uint8_t>(scr->c[y][x + 1]) == 0xFF);
+    js_pict(web_idx(), x, y, n, ap, cp, tap, tcp, big ? 1 : 0);
+    return 0;
+}
+
+/* Adam Bolt 16x16 tiles (graf-new.prf + graf-ab.prf) in big-tile mode, or text */
+static void web_graphics(bool on)
+{
+    use_graphics = on;
+    arg_graphics = on ? 2 : 0; /* GRAPHICS_ADAM_BOLT : GRAPHICS_NONE (main.cpp) */
+    ANGBAND_GRAF = on ? "new" : "ascii";
+    arg_bigtile = on;
+}
+
+/* The page's Tiles button, applied at the command prompt */
+static void web_switch_graphics(bool on)
+{
+    auto *old = game_term;
+    web_graphics(on);
+    term_activate(&web_term[0]);
+    term_resize(game_term->wid, game_term->hgt); /* takes arg_bigtile */
+    reset_visuals(p_ptr);
+    do_cmd_redraw(p_ptr);
+    term_activate(old);
+}
+
 static void hook_plog(std::string_view str)
 {
     const std::string s(str);
@@ -304,6 +354,10 @@ errr init_web(int argc, char **argv)
 
     web_react();
 
+    /* Tiles unless the page says text */
+    web_graphics(js_tiles_wanted() != 0);
+    use_bigtile = arg_bigtile;
+
     for (auto i = 0; i < WEB_TERMS; i++) {
         auto *t = &web_term[i];
         auto cols = js_term_cols(i);
@@ -322,6 +376,8 @@ errr init_web(int argc, char **argv)
         t->bigcurs_hook = term_bigcurs_web;
         t->wipe_hook = term_wipe_web;
         t->text_hook = term_text_web;
+        t->pict_hook = term_pict_web;
+        t->higher_pict = true;
 
         term_activate(t);
         angband_terms[i] = t;

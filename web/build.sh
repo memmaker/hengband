@@ -40,6 +40,6 @@ em++ -O2 -fexceptions $OBJ/*.o -o "$OUT/hengband-core.js" \
 	-sFORCE_FILESYSTEM -lidbfs.js -sENVIRONMENT=web \
 	--preload-file web/stage/lib@/hengband/lib
 
-cp web/index.html "$HOME/Games/rvip-tools/web/rvip-wm.js" web/hengband.js "$OUT/"
+cp web/index.html "$HOME/Games/rvip-tools/web/rvip-wm.js" web/hengband.js web/tiles.webp "$OUT/"
 rm -rf web/stage
 ls -la "$OUT"

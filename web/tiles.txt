@@ -1,0 +1,5 @@
+tiles.webp: Adam Bolt's 16x16 tile set (the "new" graphics of Zangband /
+Hengband, graf-new.prf), 512x1072, 32 x 67 tiles. Made from
+FrogComposband lib/xtra/graf/16x16.bmp + mask.bmp (mask = alpha), lossless.
+Tiles by Adam Bolt; pref file by Robert Ruehlmann; Hengband ids upstream.
+Stand-ins for the gaps: lib/pref/graf-ab.prf (web/mkgraf-ab.py).

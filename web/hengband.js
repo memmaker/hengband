@@ -5,7 +5,7 @@
 (function () {
 	'use strict';
 
-	var TILE = 64;                 /* source tile size in tiles.webp (Shockbolt) */
+	var TILE = 16;                 /* source tile size in tiles.webp (Adam Bolt 16x16) */
 		var PERSIST = ['/hengband/lib/save', '/hengband/lib/user', '/hengband/lib/apex', '/hengband/lib/bone'];
 
 	/* Term 0 main; the rest as in lib/pref/user-x11.prf */
@@ -59,7 +59,7 @@
 	var FONT = '"DejaVu Sans Mono", Menlo, Consolas, "Liberation Mono", monospace';
 	var GUT = 6, TITLE_H = 20, BORDER = 2;
 	var MIN_W = 90, MIN_H = 64, MAIN_MIN_W = 240, MAIN_MIN_H = 160;
-	var TILE_STEPS = [16, 20, 24, 28, 32, 36, 40, 44, 48, 56, 64];
+	var TILE_STEPS = [16, 32, 48, 64];   /* whole multiples of the 16px sheet */
 	var FONT_MIN = 8, FONT_MAX = 28;
 	var LAYOUT_FILE = '/hengband/lib/user/web-layout.json';
 	var SPLITS = ['side', 'bottom', 'inv', 'msg'];
@@ -803,7 +803,7 @@
 	}
 	tiles.onload = function () { tilesFinished(true); };
 	tiles.onerror = function () { tilesFinished(false); };
-	tilesFinished(false);   /* no tiles yet (stage 4: tiles.src = 'tiles.webp') */
+	tiles.src = 'tiles.webp';   /* Adam Bolt 16x16, drawn nearest-neighbour at cell size */
 
 	document.addEventListener('keydown', onKey);
 	document.addEventListener('DOMContentLoaded', function () {

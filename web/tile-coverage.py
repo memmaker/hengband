@@ -6,12 +6,12 @@ F:<terrain id>; an entry counts when it maps to a non-empty tile inside the
 sheet.
 
   python3 web/tile-coverage.py         own 8x8 set (graf-xxx.prf, lib/xtra/graf/8x8.bmp)
-  python3 web/tile-coverage.py shb     Shockbolt (graf-shb.prf, 64x64; stage 4)"""
+  python3 web/tile-coverage.py ab      Adam Bolt 16x16 (graf-new.prf + graf-ab.prf, web/tiles.webp; stage 4)"""
 import re, sys, os
 from PIL import Image
 L = 'lib'
-if sys.argv[1:] == ['shb']:
-    prefs, sheet, S = ('graf-shb',), os.path.expanduser('~/Games/tactical-angband/lib/tiles/shockbolt/64x64.png'), 64
+if sys.argv[1:] == ['ab']:
+    prefs, sheet, S = ('graf-new', 'graf-ab'), 'web/tiles.webp', 16
 else:
     prefs, sheet, S = ('graf-xxx',), f'{L}/xtra/graf/8x8.bmp', 8
 img = Image.open(sheet).convert('RGBA')
