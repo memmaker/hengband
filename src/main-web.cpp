@@ -14,6 +14,7 @@
 
 #include "cmd-visual/cmd-draw.h"
 #include "core/visuals-reseter.h"
+#include "game-option/option-flags.h"
 #include "game-option/runtime-arguments.h"
 #include "game-option/special-options.h"
 #include "io/input-key-acceptor.h"
@@ -31,8 +32,9 @@
 #include "world/world.h"
 #include <emscripten.h>
 #include <string_view>
+#include <vector>
 
-constexpr auto WEB_TERMS = 6;
+constexpr auto WEB_TERMS = 8; /* terms 1-7: see web_window_flags() */
 
 static term_type web_term[WEB_TERMS];
 
@@ -67,7 +69,8 @@ EM_JS(int, js_pending_rows, (int t), { return Module.qb.pendingRows(t); });
 EM_JS(void, js_apply_layout, (int t, int cols, int rows), { Module.qb.applyLayout(t, cols, rows); });
 /* Next queued input: -1 none, else key */
 EM_JS(int, js_next_event, (int at_cmd), { return Module.qb.nextEvent(at_cmd); });
-EM_JS(void, js_quit, (const char *msg), { Module.qb.quit(msg ? UTF8ToString(msg) : ""); });
+/* dead = 1: the character died (tombstone shown), the page starts a new game */
+EM_JS(void, js_quit, (const char *msg, int dead), { Module.qb.quit(msg ? UTF8ToString(msg) : "", dead); });
 EM_JS(void, js_plog, (const char *msg), { Module.qb.plog(UTF8ToString(msg)); });
 EM_JS(void, js_sync, (void), { Module.qb.sync(); });
 
@@ -344,7 +347,31 @@ static void hook_quit(std::string_view str)
 
     js_sync();
     const std::string s(str);
-    js_quit(s.data());
+    js_quit(s.data(), p_ptr->is_dead);
+}
+
+/*
+ * What each web term shows (the page's TERMS in web/hengband.js). Called
+ * from init_other() in place of its X11 defaults, before birth and load;
+ * a savefile brings its own flags.
+ */
+void web_window_flags()
+{
+    using F = SubWindowRedrawingFlag;
+    static const std::vector<F> flags[WEB_TERMS] = {
+        {},
+        { F::INVENTORY }, /* 1 Inventory */
+        { F::MESSAGE }, /* 2 Messages */
+        { F::SIGHT_MONSTERS }, /* 3 Visible */
+        { F::MONSTER_LORE, F::ITEM_KNOWLEDGE }, /* 4 Recall */
+        { F::EQUIPMENT }, /* 5 Equipment */
+        { F::FOUND_ITEMS }, /* 6 Objects */
+        { F::PLAYER }, /* 7 Character */
+    };
+    for (auto i = 0; i < WEB_TERMS; i++) {
+        g_window_flags[i].clear();
+        g_window_flags[i].set(flags[i].begin(), flags[i].end());
+    }
 }
 
 errr init_web(int argc, char **argv)

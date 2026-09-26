@@ -484,6 +484,12 @@ int take_hit(PlayerType *player_ptr, int damage_type, int damage, std::string_vi
         auto &death_message = *death_message_opt;
         constexpr auto max_last_words = 1024;
         const auto prompt = is_seppuku_by_won ? _("辞世の句: ", "Haiku: ") : _("断末魔の叫び: ", "Last words: ");
+#ifdef USE_WEB
+        /* One prompt: Enter takes the text, Esc keeps the default line */
+        if (const auto input_last_words = input_string(prompt, max_last_words, death_message)) {
+            death_message = *input_last_words;
+        }
+#else
         while (true) {
             const auto input_last_words = input_string(prompt, max_last_words, death_message);
             if (!input_last_words) {
@@ -495,6 +501,7 @@ int take_hit(PlayerType *player_ptr, int damage_type, int damage, std::string_vi
                 break;
             }
         }
+#endif
 
         if (death_message.empty()) {
 #ifdef JP

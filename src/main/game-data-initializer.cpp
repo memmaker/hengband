@@ -79,10 +79,15 @@ void init_other(PlayerType *player_ptr)
         }
     }
 
+#ifdef USE_WEB
+    extern void web_window_flags();
+    web_window_flags();
+#else
     g_window_flags[1].clear();
     g_window_flags[1].set(SubWindowRedrawingFlag::MESSAGE);
     g_window_flags[2].clear();
     g_window_flags[2].set(SubWindowRedrawingFlag::INVENTORY);
+#endif
 }
 
 /*!

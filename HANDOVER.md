@@ -395,3 +395,73 @@
   it in the web build (as Frog did) or keep the floor files in IDBFS.
 - `web/deploy.sh` from Frog's, target `ruzzoli.de/roguelikes/hengband/`,
   no deploy until stage 7.
+
+### Stage 5 (web page): done 2026-09-26
+- **Windows** (`rvip-wm.js`, shared copy; `web/index.html` `#t-<id>`,
+  `TERMS` in `web/hengband.js`, 8 terms = `WEB_TERMS` in
+  `src/main-web.cpp`, the z-term maximum): 0 Map, 1 Inventory `INVENTORY`,
+  2 Messages `MESSAGE`, 3 Visible `SIGHT_MONSTERS`, 4 Recall
+  `MONSTER_LORE|ITEM_KNOWLEDGE`, 5 Equipment `EQUIPMENT`, 6 Objects
+  `FOUND_ITEMS`, 7 Character `PLAYER` (all `SubWindowRedrawingFlag`s exist
+  upstream, no new flag). Default on: Map, Inventory, Visible, Messages.
+- **Wrong-content bug**: `main/game-data-initializer.cpp` `init_other()`
+  (runs *after* `init_web()`) hard-set term 1 = MESSAGE, term 2 =
+  INVENTORY (X11 order). Under `USE_WEB` it now calls `web_window_flags()`
+  (the one table, `main-web.cpp`). Birth only fills empty terms 1/2; a
+  savefile brings its own flags.
+- **Prompt line**: `#t-main .wm-topl` CSS in `index.html` (one row high,
+  full width, opaque, no wrap) + `fitCanvas()` sets `--row-h`/`--row-font`
+  from term 0's cell size: the box covers exactly row 0 (the game's own
+  message row), never the `i`/`e` list below. Text still from C++ (row 0).
+- **Layout file** `/hengband/lib/user/web-layout.json` (IDBFS: splits, wm
+  tree incl. which windows are on, zoom, fonts, titles, Tiles).
+- **Temp-files prompt fixed**: `floor/floor-save.cpp` `init_saved_floors()`
+  forces `force = true` under `USE_WEB` (leftover `0.PLAYER.Fnn` deleted
+  silently at start).
+- **Game end**: one path, `play_game()` → `close_game()`
+  (`core/game-closer.cpp`: Ctrl-X → save + "Press Return (or Escape)";
+  death → tombstone + filename prompt (RET/ESC → character sheet) → scores)
+  → `quit("")` → `quit_aux` = `hook_quit` → `js_quit(msg, p_ptr->is_dead)`.
+  Dead: page syncs and reloads into a new birth (quick start offered).
+  Ctrl-X: "Play again" overlay, reload restores. Only `exit()` calls are in
+  `term/z-util.cpp` `quit()`, after `quit_aux`. **Last words**
+  (`player/player-damage.cpp`): under `USE_WEB` one `input_string()`, Enter
+  takes the text, Esc keeps the random default line, no "Are you sure?"
+  loop. "Dump the screen? [y/n]" before it takes Esc.
+- **Help**: `build.sh` writes a stub `help.html` (stage 6 replaces it).
+- **`web/deploy.sh`**: Frog's, target `ruzzoli.de/roguelikes/hengband/`,
+  guard first. Dry run: "commit + push first", exit 1. **Not deployed, no
+  repo** (only remote `upstream`, no `@{u}`).
+- Tested (own tab, 127.0.0.1, 1440x900 and 1000x650): new Skeleton
+  Weaponsmith → Inventory, Messages, Equipment, Character sheet, Objects
+  ("Found items"), White icky thing in Visible and (after `*`) Recall;
+  all 8 windows on → Ctrl-S → reload → same layout, character restored;
+  fake `0.PLAYER.F01` + reload → no prompt, file gone; Ctrl-X → Press
+  Return → overlay → Play again → restored; suicide `Q y @` → tombstone →
+  RET sheet → ESC → "Score not registered" → reload → quick start → new
+  character; debug death (`"` `Y:allow_debug_opts`, `^A k` 1000000 dmg,
+  type 10) → "Dump the screen?" Esc → Last words Esc → tombstone → new
+  game; `i` prompt row exactly one 16 px row, list rows intact; Help
+  opens/Esc closes; no console errors. IDBFS `/hengband/lib/*` deleted.
+  Native ASan (gcu, seed 51, 2500 new + 1500 restored keys; the C++
+  changes are all `USE_WEB`): clean.
+- Open problems: a dead character's message history shows in the new
+  character's Messages window when it starts via quick start; Character
+  window shows only the first sheet page; Map window gets small with all 8
+  windows on (the WM splits it; user can drag); the "Recall" window needs
+  a look/target (`*`, `l` only on interesting grids).
+
+### Next: stage 6 (docs + sound)
+- Sound: `sound.cfg` is already in the preload (`lib/xtra/sound/sound.cfg`)
+  and read by `loadSoundCfg()` in `hengband.js`; `js_sound` hook exists in
+  `main-web.cpp` (`sound_names`). Wavs: Hengband's own `lib/xtra/sound`
+  (submodule `hengband.xtra`) if licensed, else `web/sounds.py` from
+  Frog's/Zangband's (Dubtrain wavs).
+- Music: Hengband's own `lib/xtra/music/*.mp3` (stage 1 note) instead of
+  the Quickband `new_town.ogg` placeholder `build.sh` copies now.
+  Sound/Music buttons off by default.
+- Help: `web/make-help.py` from Frog's with `PAGE='hengband.html'`
+  (replace the `help.html` stub line in `build.sh`); Docs entry under
+  `~/Desktop/Games/Roguelikes/Docs/` with both keysets (original + roguelike;
+  explore `X` only in the original keyset); Adam Bolt tile credit
+  (`web/tiles.txt`).

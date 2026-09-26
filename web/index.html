@@ -48,6 +48,9 @@
 	.win > .t .zoom button { padding: 0 5px; font-size: 11px; line-height: 14px; height: 16px; }
 	.win > .body { flex: 1; min-height: 0; overflow: hidden; }
 	.win canvas { display: block; }
+	/* prompt line (RvipWM.prompt): one cell row high, row 0 of the map term, no wrapping */
+	#t-main .wm-topl { right: 0; padding: 0 4px; border-width: 0; background: #000; white-space: pre; overflow: hidden;
+		font: var(--row-font, 12px)/var(--row-h, 16px) "DejaVu Sans Mono", Menlo, Consolas, "Liberation Mono", monospace; }
 	.split { position: absolute; background: var(--gut); z-index: 2; touch-action: none; }
 	.split.v { cursor: col-resize; }
 	.split.h { cursor: row-resize; }
@@ -118,6 +121,8 @@
 	<div class="win" id="t-mon"><div class="t"><span class="name" title="Click to rename"></span></div><div class="body"><canvas></canvas></div></div>
 	<div class="win" id="t-msg"><div class="t"><span class="name" title="Click to rename"></span></div><div class="body"><canvas></canvas></div></div>
 	<div class="win" id="t-rec"><div class="t"><span class="name" title="Click to rename"></span></div><div class="body"><canvas></canvas></div></div>
+	<div class="win" id="t-obj"><div class="t"><span class="name" title="Click to rename"></span></div><div class="body"><canvas></canvas></div></div>
+	<div class="win" id="t-chr"><div class="t"><span class="name" title="Click to rename"></span></div><div class="body"><canvas></canvas></div></div>
 </div>
 
 <div id="help" hidden>

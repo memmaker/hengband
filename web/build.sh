@@ -41,5 +41,7 @@ em++ -O2 -fexceptions $OBJ/*.o -o "$OUT/hengband-core.js" \
 	--preload-file web/stage/lib@/hengband/lib
 
 cp web/index.html "$HOME/Games/rvip-tools/web/rvip-wm.js" web/hengband.js web/tiles.webp "$OUT/"
+# Help: stub until stage 6 (make-help.py)
+echo '<h2>Hengband</h2><p>The full guide comes with the docs (stage 6). In-game help: <kbd>?</kbd>. Command menu: <kbd>Enter</kbd>. Explore: <kbd>X</kbd>. Save: <kbd>Ctrl-S</kbd>, save and quit: <kbd>Ctrl-X</kbd>.</p>' > "$OUT/help.html"
 rm -rf web/stage
 ls -la "$OUT"

@@ -62,6 +62,9 @@ static void check_saved_tmp_files(const int fd, bool *force)
  */
 void init_saved_floors(bool force)
 {
+#ifdef USE_WEB
+    force = true; /* a reload leaves the floor files behind; one game per tab */
+#endif
     auto fd = -1;
     for (int i = 0; i < MAX_SAVED_FLOORS; i++) {
         saved_floor_type *sf_ptr = &saved_floors[i];
