@@ -308,6 +308,10 @@ bool save_player(PlayerType *player_ptr, SaveType type)
         safe_setuid_drop();
         world.character_loaded = true;
         result = true;
+#ifdef USE_WEB
+        extern void web_sync_files();
+        web_sync_files();
+#endif
     }
 
     if (type != SaveType::CLOSE_GAME) {

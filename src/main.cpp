@@ -411,6 +411,16 @@ int main(int argc, char *argv[])
     process_player_name(p_ptr, true);
     quit_aux = quit_hook;
 
+#ifdef USE_WEB
+    if (!done) {
+        extern errr init_web(int, char **);
+        if (0 == init_web(argc, argv)) {
+            ANGBAND_SYS = "x11";
+            done = true;
+        }
+    }
+#endif
+
 #ifdef USE_X11
     if (!done && (mstr.empty() || (mstr == "x11"))) {
         extern errr init_x11(int, char **);

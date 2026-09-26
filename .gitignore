@@ -445,3 +445,6 @@ Makefile
 # (the BOT_PLAY savefile and the --bot-json-output snapshot logs).
 /BOT_PLAY
 /bot-state*.jsonl
+web/dist/
+web/obj/
+web/stage/

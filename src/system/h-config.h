@@ -43,14 +43,18 @@ constexpr auto MAINTAINER = "echizen@users.sourceforge.jp";
 #else
   #define PATH_SEP "/"
   #define SET_UID
+  #ifndef USE_WEB
   #define PRIVATE_USER_PATH "~/.angband"
+  #endif
   #define SAVEFILE_USE_UID
   
   #if !defined(HAVE_CONFIG_H)
     #define HAVE_USLEEP
   #endif
   
+  #ifndef USE_WEB
   #define SAFE_SETUID
+  #endif
   /* Pick up system's definition of _POSIX_SAVED_IDS. */
   #include <unistd.h>
   #ifdef _POSIX_SAVED_IDS
