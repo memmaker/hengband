@@ -15,6 +15,7 @@
 #include "util/string-processor.h"
 #include "view/display-messages.h"
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -403,7 +404,14 @@ void FileDisplayer::display(bool show_version, std::string_view name_with_tag, i
                 break;
             }
 
-            this->display(true, *ask_result, 0, mode);
+            /* A typed name that doesn't exist must not abort the game */
+            try {
+                this->display(true, *ask_result, 0, mode);
+            } catch (const std::runtime_error &) {
+                bell();
+                break;
+            }
+
             if (this->is_terminated) {
                 skey = 'q';
             }
