@@ -1524,9 +1524,9 @@ void term_erase(int x, int y, tl::optional<int> n_opt)
      * 全角文字の右半分から文字を表示する場合、
      * 重なった文字の左部分を消去。
      */
-    if (n > 0 && (((scr_aa[x] & AF_KANJI2) && !(scr_aa[x] & AF_TILE1)) || (scr_aa[x] & AF_BIGTILE2) == AF_BIGTILE2))
+    if (n > 0 && x > 0 && (((scr_aa[x] & AF_KANJI2) && !(scr_aa[x] & AF_TILE1)) || (scr_aa[x] & AF_BIGTILE2) == AF_BIGTILE2))
 #else
-    if (n > 0 && (scr_aa[x] & AF_BIGTILE2) == AF_BIGTILE2)
+    if (n > 0 && x > 0 && (scr_aa[x] & AF_BIGTILE2) == AF_BIGTILE2)
 #endif
     {
         x--;
