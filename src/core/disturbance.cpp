@@ -1,4 +1,5 @@
 #include "core/disturbance.h"
+#include "cmd-action/cmd-explore.h"
 #include "action/travel-execution.h"
 #include "game-option/disturbance-options.h"
 #include "game-option/map-screen-options.h"
@@ -19,6 +20,7 @@
 void disturb(PlayerType *player_ptr, bool stop_search, bool stop_travel)
 {
     auto &rfu = RedrawingFlagsUpdater::get_instance();
+    auto_explore = false; /* RVIP */
     if (command_rep) {
         command_rep = 0;
         rfu.set_flag(MainWindowRedrawingFlag::ACTION);

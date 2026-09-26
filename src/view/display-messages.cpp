@@ -1,4 +1,5 @@
 #include "view/display-messages.h"
+#include "cmd-action/cmd-explore.h"
 #include "core/window-redrawer.h"
 #include "game-option/cheat-options.h"
 #include "game-option/input-options.h"
@@ -305,6 +306,7 @@ void msg_print(std::string_view msg)
 
     if (world.character_generated) {
         message_add(msg);
+        auto_explore = false; /* RVIP: any new message stops auto-explore */
     }
 
     while (std::ssize(msg) > split_width) {

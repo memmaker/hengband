@@ -16,6 +16,7 @@
 #include "cmd-action/cmd-racial.h"
 #include "cmd-action/cmd-shoot.h"
 #include "cmd-action/cmd-spell.h"
+#include "cmd-action/cmd-explore.h"
 #include "cmd-action/cmd-travel.h"
 #include "cmd-action/cmd-tunnel.h"
 #include "cmd-building/cmd-building.h"
@@ -677,6 +678,14 @@ void process_command(PlayerType *player_ptr)
     }
     case KTRL('V'): {
         spoil_random_artifact(player_ptr);
+        break;
+    }
+    case 'X': {
+        /* RVIP: auto-explore */
+        if (!is_wild_mode) {
+            explore_step(player_ptr);
+        }
+
         break;
     }
     case '`': {

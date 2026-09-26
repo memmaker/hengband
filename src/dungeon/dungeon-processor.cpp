@@ -1,4 +1,5 @@
 #include "dungeon/dungeon-processor.h"
+#include "cmd-action/cmd-explore.h"
 #include "cmd-io/cmd-dump.h"
 #include "core/disturbance.h"
 #include "core/object-compressor.h"
@@ -98,6 +99,7 @@ void process_dungeon(PlayerType *player_ptr, bool load_game)
     auto &world = AngbandWorld::get_instance();
     world.is_loading_now = false;
     player_ptr->leaving = false;
+    explore_new_level(); /* RVIP */
 
     command_cmd = 0;
     command_rep = 0;

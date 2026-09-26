@@ -1,4 +1,5 @@
 #include "cmd-action/cmd-move.h"
+#include "cmd-action/cmd-explore.h"
 #include "action/action-limited.h"
 #include "action/movement-execution.h"
 #include "action/run-execution.h"
@@ -87,7 +88,7 @@ void do_cmd_go_up(PlayerType *player_ptr)
     PlayerClass(player_ptr).break_samurai_stance({ SamuraiStanceType::MUSOU });
 
     if (terrain.flags.has_not(TerrainCharacteristics::UP_STAIRS)) {
-        msg_print(_("ここには上り階段が見当たらない。", "I see no up staircase here."));
+        explore_to_stairs(player_ptr, true); /* RVIP: walk to the nearest known one */
         return;
     }
 
@@ -209,7 +210,7 @@ void do_cmd_go_down(PlayerType *player_ptr)
     auto &grid = floor.grid_array[player_ptr->y][player_ptr->x];
     auto &terrain = grid.get_terrain();
     if (terrain.flags.has_not(TerrainCharacteristics::DOWN_STAIRS)) {
-        msg_print(_("ここには下り階段が見当たらない。", "I see no down staircase here."));
+        explore_to_stairs(player_ptr, false); /* RVIP: walk to the nearest known one */
         return;
     }
 

@@ -114,7 +114,7 @@ short InputKeyRequestor::get_command()
     inkey_flag = true;
     term_fresh();
     short cmd = inkey(true);
-    if (!this->shopping && command_menu && ((cmd == '\r') || (cmd == '\n') || (cmd == 'x') || (cmd == 'X')) && !keymap_actions_map[this->mode][(byte)(cmd)]) {
+    if (!this->shopping && command_menu && ((cmd == '\r') || (cmd == '\n') || (cmd == 'x')) && !keymap_actions_map[this->mode][(byte)(cmd)]) {
         cmd = this->inkey_from_menu();
     }
 

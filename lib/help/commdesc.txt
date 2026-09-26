@@ -107,8 +107,18 @@ Run (.) or Run (,)
      specified objects will be picked up or destroyed.
 
 
+Auto-explore (X)
+     Walks, one step per turn, towards the nearest unexplored place
+     or unvisited item you know of. Opens doors, digs through rubble,
+     and avoids known traps, shops, lava and deep water. Stops on any
+     message, a visible monster, a key press, or when nothing is left
+     (it tells you when only locked doors or known traps are in the
+     way). Original keyset only.
+
 Go up staircase (<)
-     Climbs up when you are standing on an up staircase. In the
+     Climbs up when you are standing on an up staircase. When you are
+     not, walks to the nearest up staircase you know of and takes it
+     (a disturbance stops the walk; press again to resume). In the
      wilderness, enter global map mode which grants you a view of all
      the world unless there are some monsters in the nearby area.
 
@@ -124,7 +134,9 @@ Go up staircase (<)
      in which case the artifacts may show up again later.
 
 Go down staircase (>)
-     Descends when you are standing on a down staircase. In the
+     Descends when you are standing on a down staircase. When you are
+     not, walks to the nearest down staircase you know of (in town: the
+     dungeon entrance) and takes it. In the
      wilderness, return from global map mode to normal mode.
 
      There are always at least two staircases going down on each

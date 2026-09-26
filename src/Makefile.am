@@ -98,6 +98,7 @@ hengband_SOURCES = \
 	cmd-action/cmd-shoot.cpp cmd-action/cmd-shoot.h \
 	cmd-action/cmd-spell.cpp cmd-action/cmd-spell.h \
 	cmd-action/cmd-travel.cpp cmd-action/cmd-travel.h \
+	cmd-action/cmd-explore.cpp cmd-action/cmd-explore.h \
 	cmd-action/cmd-tunnel.cpp cmd-action/cmd-tunnel.h \
 	\
 	cmd-building/cmd-building.cpp cmd-building/cmd-building.h \

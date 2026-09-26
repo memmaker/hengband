@@ -37,9 +37,9 @@ C:0:9
 A:\r
 C:0:^J
 
-# Hack -- swap equipment
-A:w0
-C:0:X
+# Hack -- swap equipment (RVIP: X is auto-explore in the original keyset)
+# A:w0
+# C:0:X
 
 
 ##### Roguelike Keyset Mappings #####

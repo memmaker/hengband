@@ -119,3 +119,110 @@
 - Free keys (original keyset, from the `process_command()` switch): `X`
   (Frog's explore key) is free; also `h n x y H J K N O P W Y Z` are unused
   letters (check the roguelike keyset before choosing).
+
+### Stage 2 (explore + stairs): done 2026-09-26
+- **Explore key `X`** (original keyset). `X` was a keymap to `w0` (swap
+  weapons by `@0` inscription) in both keysets and one of the keys that
+  open the command menu: the keyset-0 keymap is commented out in
+  `lib/pref/pref-key.prf`, `X` dropped from the menu test in
+  `io/input-key-requester.cpp` `request_command()` (Enter / `x` still open
+  it). Roguelike keyset: `X` is still `w0`, no explore key there.
+- Code: `src/cmd-action/cmd-explore.cpp/.h` (port of Frog's end of
+  `cmd2.c`; in `src/Makefile.am`, so `web/build.sh` picks it up):
+  `auto_explore`, `explore_stairs`, `explore_new_level()`, `explore_find()`
+  (BFS), `explore_step()`, `explore_to_stairs()`, `explore_stairs_arrive()`.
+- Hooks: `io/input-key-processor.cpp` `process_command()` `case 'X'` (not
+  in wild mode); `core/player-processor.cpp`: `auto_explore` in
+  `continuous_action_running()` (key abort), `else if (auto_explore)
+  explore_step()` before running, `else if (explore_stairs)
+  explore_stairs_arrive()` after the travel branch;
+  `dungeon/dungeon-processor.cpp` `process_dungeon()` calls
+  `explore_new_level()` after `leaving = false`; `core/disturbance.cpp`
+  `disturb()` and `view/display-messages.cpp` `msg_print()` (every message
+  once `character_generated`) clear `auto_explore`;
+  `cmd-action/cmd-move.cpp` `do_cmd_go_up/down()` call
+  `explore_to_stairs()` instead of "I see no ... staircase here".
+- **Known grid**: `grid.is_mark() || (grid.info & CAVE_KNOWN)`. CAVE_KNOWN
+  ("directly viewed", set by `note_spot()`) is never forgotten, so no own
+  seen array is needed (unlit floor loses CAVE_MARK, not CAVE_KNOWN).
+  Terrain as the player sees it: `grid.get_terrain(TerrainKind::MIMIC)`.
+- Targets: known grid next to an unknown one, or an item with
+  `OmType::FOUND` not stood on yet (set of `ItemEntity*` per level;
+  `OmType::TOUCHED` is game state, not used). Avoids TRAP, STORE, BLDG,
+  QUEST_ENTER, LAVA, deep WATER, visible monsters, else
+  `player_can_enter()`. Opens closed doors with `exe_open()` unless locked
+  (true terrain `door_power` or no OPEN); digs rubble (CAN_DIG, not
+  WALL/MOVE) with `exe_tunnel()`. Stops: disturb, new message, visible
+  non-pet/non-friendly monster whose grid `is_view()` ("In view: the
+  Frail yeek."), step that did not move, no light (`no_lite()`, and in the
+  dungeon `cur_lite <= 0`: without its own light it walked back and forth
+  at a lit room's exit forever), confused/blind/hallucinating, surface
+  outside a town, nothing left ("Only locked doors or known traps are in
+  the way." when that is why).
+- Stairs: BFS for the nearest known UP/DOWN_STAIRS (not QUEST_ENTER) →
+  `Travel::get_instance().set_goal()`; the per-turn travel branch walks,
+  `explore_stairs_arrive()` takes the stairs once travel stopped on them
+  (prompts like "Do you really get in this dungeon?" kept). On the surface
+  the BFS may cross unknown grids (travel does too), so `>` in town finds
+  the dungeon entrance at night. Travel itself refuses without light ("You
+  cannot see!"). `<` on the surface keeps the world-map toggle; `>` in wild
+  mode keeps leaving it; `X` does nothing on the world map.
+- **auto_more (3d)**: Hengband's `auto_more` still stops at `-more-` when
+  no term has the MESSAGE window flag / it overflowed
+  (`is_msg_window_flowed()`); `skip_more` never stops. Defaults for new
+  characters come from `lib/pref/pref-opt.prf` (read at start, before the
+  savefile; the table defaults in `option-types-table.cpp` are overridden
+  by it), so `web/build.sh` rewrites the staged copy: `Y:auto_more`,
+  `Y:skip_more`, `Y:center_player`. Savefiles keep their own options (an
+  old test save kept them off: delete test IDBFS databases first).
+- Help: `lib/help/command.txt` (X row, `@0` note), `commdesc.txt`
+  (Auto-explore, `<`/`>` walk).
+- Tested in the browser (own tab, 127.0.0.1): new Human Warrior, town
+  (day) `X` = "Nothing left", `>` walked to the nearest entrance (Yeek
+  cave) and asked; dungeon: explore over ~60 presses (rooms, corridors,
+  doors opened, rubble dug, items/gold picked up, monster stops with name,
+  "Only locked doors or known traps" once, no light stop), `>` walked to
+  a known `>` and descended, `<` walked to `<` and went up (twice, once
+  back to town). Test IDBFS databases (`/hengband/lib/*`) deleted.
+- ASan (native, own copy of stage 1's pty driver with `X` ×25 and `<`/`>`
+  ×8 in the key pool): one upstream bug, fixed in `port:` commit
+  `23e62fd4e` (help `%` Goto File with an unknown name threw an uncaught
+  `runtime_error` from `FileDisplayer::display()` = abort, also on the
+  web), then clean: seeds 1-11 (3000 keys new + 2000 after restore; some
+  restores ended early when the random keys had killed the character).
+- Open problems: explore stops on each "You see ..." when it walks over an
+  item again, and on a revisited (saved) floor it re-visits every item
+  (the stood-on set is per level visit); a visible monster it cannot
+  reach (behind a wall, "Blinking dot") blocks explore until it moves or
+  dies (Frog rule); the ending "You have removed the rubble" message stops
+  explore once per rubble; no explore key in the roguelike keyset.
+
+### Next: stage 3 (Enter menu + inventory)
+- Template: Frog's Stage 3 in `~/Games/frogcomposband/HANDOVER.md`
+  (rewritten `inkey_from_menu()` as Zangband's `cmd_menu()`, `gear_ui()`
+  with an `obj_prompt()` preselect).
+- Key dispatch: `io/input-key-requester.cpp`
+  `InputKeyRequestor::request_command()` → `process_command()` in
+  `io/input-key-processor.cpp` (switch on `command_cmd`). Hengband's own
+  command menu: `InputKeyRequestor::inkey_from_menu()` (same file, opened
+  by Enter / `x` when `command_menu` is on and no keymap), data in
+  `cmd-io/cmd-menu-content-table.cpp` (`menu_info[][]`,
+  `special_menu_info[]`); `autopick/autopick-menu-data-table.cpp` is the
+  autopick editor's menu, not this one. Add `X` (explore) to the menu.
+- Items: `i`/`e` = `do_cmd_inven()` / `do_cmd_equip()`
+  (`cmd-item/cmd-item.cpp`); every item prompt goes through
+  `choose_item()` (`floor/floor-object.cpp`) → `get_item_floor()`
+  (`inventory/floor-item-getter.cpp`) with `USE_INVEN|USE_EQUIP|USE_FLOOR`
+  flags (`object/item-use-flags.h`) and an `ItemTester`
+  (`object/item-tester-hooker.h`, e.g. `FuncItemTester(item_tester_hook_quaff)`
+  in `cmd-item/cmd-quaff.cpp`); helpers in `inventory/item-selection-util.cpp`.
+- Test characters: `lib/pref/pref-opt.prf` has `Y:command_menu`; birth as
+  above (Warrior carries torches unwielded: `w` one before the dungeon).
+- **Tiles (stage 4): Adam Bolt 16x16, the user's explicit choice**
+  (overrides the stage 1 Shockbolt fallback; the 95% rule is waived for
+  this game, gaps get same-set stand-ins, never a second set). Upstream
+  never had the sheet in git (`hengband` and `hengband.xtra` history only
+  carry `graf/8x8.bmp`; `graf-new.prf` exists without its image): take
+  `~/Games/frogcomposband/lib/xtra/graf/16x16.bmp` (same Adam Bolt sheet)
+  with Frog's `lib/pref/graf-new.prf`, remapped to Hengband's JSON ids
+  (`R:`/`K:`/`F:` by id, see stage 1).

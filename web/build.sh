@@ -14,6 +14,10 @@ mkdir -p "$OUT/music" && cp ../quickband/web/music/new_town.ogg "$OUT/music/"
 for d in edit file help pref; do cp -R lib/$d web/stage/lib/; done
 mkdir -p web/stage/lib/xtra/sound && cp lib/xtra/sound/sound.cfg web/stage/lib/xtra/sound/ 2>/dev/null || true
 for d in data info save user apex bone script; do mkdir -p web/stage/lib/$d; done
+# auto_more + skip_more (RVIP 3d: Hengband's auto_more still stops when the
+# message window overflows, skip_more never stops) and center_player are on for new web characters; the
+# defaults come from pref-opt.prf (read at start, before the savefile)
+f=web/stage/lib/pref/pref-opt.prf; sed -e 's/^X:auto_more$/Y:auto_more/' -e 's/^X:skip_more$/Y:skip_more/' -e 's/^X:center_player$/Y:center_player/' $f > $f.new && mv $f.new $f
 find web/stage \( -name 'Makefile*' -o -name 'delete.me' -o -name '*.vim' -o -name '*.sh' \) -delete
 
 # Sources: every .cpp of src/Makefile.am (the autotools list) except the
