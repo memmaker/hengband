@@ -237,6 +237,12 @@ tl::optional<ExploreTarget> explore_find(PlayerType *player_ptr, int stairs, boo
 }
 }
 
+/* RVIP: also used to decide whether the item list reopens after an item action */
+bool hostile_monster_in_view(PlayerType *player_ptr)
+{
+    return hostile_in_view(player_ptr) != nullptr;
+}
+
 void explore_new_level()
 {
     auto_explore = false;

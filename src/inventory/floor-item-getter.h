@@ -7,3 +7,6 @@
 class PlayerType;
 class ItemTester;
 tl::optional<short> get_item_floor(PlayerType *player_ptr, std::string_view pmt, std::string_view str, BIT_FLAGS mode, const ItemTester &item_tester);
+
+/* RVIP: the item an inventory item menu chose; the next item prompt returns it */
+extern tl::optional<short> item_preselect;

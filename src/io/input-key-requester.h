@@ -4,6 +4,8 @@
 #include "game-option/keymap-directory-getter.h"
 #include "system/angband.h"
 #include <string>
+#include <string_view>
+#include <vector>
 #include <tl/optional.hpp>
 
 extern bool use_menu;
@@ -19,7 +21,14 @@ extern int16_t command_new;
 
 enum class KeymapMode;
 class PlayerType;
-class SpecialMenuContent;
+
+/* RVIP: boxed menus, command keys of the current keyset, commands queued past the keymaps */
+int box_draw(int &x, int &y, std::string_view title, const std::vector<std::string> &text, int cur);
+int box_menu(int x, int y, std::string_view title, const std::vector<std::string> &text, const std::string &keys, int cur);
+char command_key(char cmd);
+std::string command_key_str(char cmd);
+void queue_raw_command(char cmd);
+
 class InputKeyRequestor {
 public:
     InputKeyRequestor(PlayerType *player_ptr, bool shopping);
@@ -29,14 +38,6 @@ private:
     PlayerType *player_ptr;
     bool shopping;
     KeymapMode mode;
-    int base_y;
-    int base_x = 15;
-    int menu_num = 0;
-    int num = 0;
-    char command = 0;
-    int max_num = 0;
-    bool is_max_num_odd = false;
-    char sub_cmd = 0;
 
     void process_input_command();
     short get_command();
@@ -49,13 +50,4 @@ private:
     int get_caret_command() const;
     void sweep_confirmation_equipments();
     void confirm_command(const tl::optional<std::string> &inscription, const int caret_command);
-
-    void make_commands_frame() const;
-    std::string switch_special_menu_condition(const SpecialMenuContent &special_menu) const;
-    int get_command_per_menu_num();
-    bool check_continuous_command();
-    bool check_escape_key(const int old_num);
-    bool process_down_cursor();
-    bool process_up_cursor();
-    void process_right_left_cursor();
 };

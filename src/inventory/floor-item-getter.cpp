@@ -207,6 +207,8 @@ static void test_equipment_floor(PlayerType *player_ptr, FloorItemSelection *fis
     }
 }
 
+tl::optional<short> item_preselect;
+
 /*!
  * @brief オブジェクト選択の汎用関数(床上アイテム用) /
  * Let the user select an item, save its "index"
@@ -219,6 +221,19 @@ static void test_equipment_floor(PlayerType *player_ptr, FloorItemSelection *fis
 tl::optional<short> get_item_floor(PlayerType *player_ptr, std::string_view pmt, std::string_view str, BIT_FLAGS mode, const ItemTester &item_tester)
 {
     FloorItemSelection fis(mode);
+
+    /* RVIP: an inventory item menu chose the item already (only for the first prompt) */
+    if (item_preselect) {
+        const auto want = *item_preselect;
+        item_preselect = tl::nullopt;
+        const auto slot = i2enum<inventory_slot_type>(want);
+        const auto in_place = (fis.inven && INVEN_PACK_SLOTS.contains(slot)) || (fis.equip && INVEN_WIELDING_SLOTS.contains(slot));
+        if (in_place && get_item_okay(player_ptr, want, item_tester)) {
+            repeat_push(want);
+            return want;
+        }
+    }
+
     static char prev_tag = '\0';
     const auto &[i_idx, tag] = check_floor_item_tag(player_ptr, fis, prev_tag, item_tester);
     prev_tag = tag;

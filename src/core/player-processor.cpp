@@ -1,4 +1,6 @@
 #include "core/player-processor.h"
+#include "cmd-item/cmd-item.h"
+#include "inventory/floor-item-getter.h"
 #include "action/run-execution.h"
 #include "action/travel-execution.h"
 #include "cmd-action/cmd-explore.h"
@@ -313,12 +315,26 @@ void process_player(PlayerType *player_ptr)
             rfu.set_flags(flags);
             window_stuff(player_ptr);
 
+            /* RVIP: reopen the item list after an item action (not in danger) */
+            if (gear_reopen && !command_new) {
+                if (!hostile_monster_in_view(player_ptr)) {
+                    queue_raw_command(gear_reopen);
+                }
+
+                gear_reopen = 0;
+            }
+
             can_save = true;
             output_bot_json_snapshot(player_ptr);
             InputKeyRequestor(player_ptr, false).request_command();
             can_save = false;
             mark_monsters_present(player_ptr);
             process_command(player_ptr);
+
+            /* RVIP: an item menu's preselection is for the next command only */
+            if (!command_new) {
+                item_preselect = tl::nullopt;
+            }
         }
 
         pack_overflow(player_ptr);

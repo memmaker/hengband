@@ -119,6 +119,25 @@ static void web_apply_layout()
 }
 
 /* Move queued browser input into the main term's key queue */
+/* Append a key to the queue (FIFO; term_key_push() puts keys back in front,
+ * which reversed multi-key events such as the arrow-key macro triggers) */
+static void web_keypress(int k)
+{
+    auto *t = game_term;
+    if (!k) {
+        return;
+    }
+
+    t->key_queue[t->key_head] = static_cast<char>(k);
+    if (++t->key_head == t->key_size) {
+        t->key_head = 0;
+    }
+
+    if (t->key_head == t->key_tail) { /* overflow: drop the key */
+        t->key_head = (t->key_head == 0) ? t->key_size - 1 : t->key_head - 1;
+    }
+}
+
 static bool web_pump()
 {
     auto got = false;
@@ -131,7 +150,7 @@ static bool web_pump()
     while ((k = js_next_event(web_at_prompt())) >= 0) {
         /* No mouse support in this variant */
         if (k != 0x10000) {
-            term_key_push(k);
+            web_keypress(k);
         }
         got = true;
     }
@@ -139,7 +158,7 @@ static bool web_pump()
     /* Safe autosave: only while waiting for a command */
     if (web_want_save && web_at_prompt() && !p_ptr->is_dead && !got && (game_term->key_head == game_term->key_tail)) {
         web_want_save = false;
-        term_key_push(KTRL('S'));
+        web_keypress(KTRL('S'));
         got = true;
     }
 

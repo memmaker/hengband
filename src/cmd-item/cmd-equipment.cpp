@@ -1,4 +1,5 @@
 #include "cmd-item/cmd-equipment.h"
+#include "cmd-item/cmd-item.h"
 #include "action/weapon-shield.h"
 #include "artifact/fixed-art-types.h"
 #include "autopick/autopick.h"
@@ -93,34 +94,7 @@ static void do_curse_on_equip(OBJECT_IDX slot, ItemEntity &item, PlayerType *pla
  */
 void do_cmd_equip(PlayerType *player_ptr)
 {
-    command_wrk = true;
-    if (easy_floor) {
-        command_wrk = USE_EQUIP;
-    }
-
-    screen_save();
-    (void)show_equipment(player_ptr, 0, USE_FULL, AllMatchItemTester());
-    auto weight = calc_inventory_weight(player_ptr);
-    auto weight_lim = calc_weight_limit(player_ptr);
-    const auto mes = _("装備： 合計 %3d.%1d kg (限界の%d%%) コマンド: ", "Equipment: carrying %d.%d pounds (%d%% of capacity). Command: ");
-#ifdef JP
-    const auto out_val = format(mes, lb_to_kg_integer(weight), lb_to_kg_fraction(weight), weight * 100 / weight_lim);
-#else
-    const auto out_val = format(mes, weight / 10, weight % 10, weight * 100 / weight_lim);
-#endif
-
-    prt(out_val, 0, 0);
-    command_new = inkey();
-    screen_load();
-
-    if (command_new != ESCAPE) {
-        command_see = true;
-        return;
-    }
-
-    const auto &[wid, hgt] = term_get_size();
-    command_new = 0;
-    command_gap = wid - 30;
+    gear_ui(player_ptr, true); /* RVIP */
 }
 
 /*!

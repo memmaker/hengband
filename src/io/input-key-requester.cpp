@@ -20,6 +20,8 @@
 #include "system/item/item-entity.h"
 #include "system/player-type-definition.h"
 #include "term/screen-processor.h" //!< @todo 相互依存している、後で何とかする.
+#include "term/term-color-types.h"
+#include <algorithm>
 #include "util/int-char-converter.h"
 #include "util/string-processor.h"
 #include "view/display-messages.h"
@@ -38,13 +40,13 @@ int16_t command_wrk; /* アイテムの使用許可状況 (ex. 装備品のみ�
 TERM_LEN command_gap = 999; /* アイテムの表示に使う (詳細未調査) */
 int16_t command_new; /* Command chaining from inven/equip view */
 
-static char request_command_buffer[256]{}; /*!< Special buffer to hold the action of the current keymap */
+static char request_command_buffer[256]{};
+static bool command_raw = false; /*!< RVIP: command_new came from a menu: no keymap */ /*!< Special buffer to hold the action of the current keymap */
 
 InputKeyRequestor::InputKeyRequestor(PlayerType *player_ptr, bool shopping)
     : player_ptr(player_ptr)
     , shopping(shopping)
     , mode(rogue_like_commands ? KeymapMode::ROGUE : KeymapMode::ORIGINAL)
-    , base_y(player_ptr->y - panel_row_min > 10 ? 2 : 13)
 {
 }
 
@@ -106,6 +108,11 @@ short InputKeyRequestor::get_command()
         msg_erase();
         auto cmd_back = command_new;
         command_new = 0;
+        if (command_raw && (inkey_next == nullptr)) {
+            inkey_next = ""; /* RVIP: a command from a menu skips the keymaps */
+        }
+
+        command_raw = false;
         return cmd_back;
     }
 
@@ -121,51 +128,195 @@ short InputKeyRequestor::get_command()
     return cmd;
 }
 
-char InputKeyRequestor::inkey_from_menu()
+/*** RVIP: boxed menus and the command menu on Enter (Zangband's cmd_menu()) ***/
+
+void queue_raw_command(char cmd)
 {
-    prt("", 0, 0);
+    command_new = cmd;
+    command_raw = true;
+}
+
+/* The key that gives underlying command cmd in the current keyset, or 0 */
+char command_key(char cmd)
+{
+    const auto &keymap = keymap_actions_map.at(rogue_like_commands ? KeymapMode::ROGUE : KeymapMode::ORIGINAL);
+    if (!keymap.at(static_cast<uint8_t>(cmd))) {
+        return cmd;
+    }
+
+    for (auto k = 1; k < 256; k++) {
+        const auto &act = keymap.at(static_cast<uint8_t>(k));
+        if (act && (act->size() == 1) && ((*act)[0] == cmd)) {
+            return static_cast<char>(k);
+        }
+    }
+
+    return 0;
+}
+
+/* The same as text: "q", "^D", or "" */
+std::string command_key_str(char cmd)
+{
+    const auto k = static_cast<uint8_t>(command_key(cmd));
+    if (k == 0) {
+        return "";
+    }
+
+    return (k < 32) ? std::string{ '^', static_cast<char>(k + 64) } : std::string(1, static_cast<char>(k));
+}
+
+/*
+ * Draw a boxed menu at (x, y), exactly as big as its content (moved left/up
+ * to fit the screen).  x becomes the column right of the box.  Returns the
+ * row of the first entry.
+ */
+int box_draw(int &x, int &y, std::string_view title, const std::vector<std::string> &text, int cur)
+{
+    const auto &[wid, hgt] = term_get_size();
+    auto w = title.empty() ? 0 : static_cast<int>(title.size()) + 1;
+    for (const auto &t : text) {
+        w = std::max(w, static_cast<int>(t.size()) + 3);
+    }
+
+    w = std::min(w, wid - 2);
+    const auto h = static_cast<int>(text.size()) + (title.empty() ? 0 : 1);
+
+    /* ponytail: no scrolling, every menu here is shorter than the screen */
+    x = std::max(std::min(x, wid - w - 2), 0);
+    y = std::max(std::min(y, hgt - h - 2), 0);
+    const auto top = y + 1 + (title.empty() ? 0 : 1);
+    const auto edge = "+" + std::string(w, '-') + "+";
+    c_put_str(TERM_WHITE, edge, y, x);
+    c_put_str(TERM_WHITE, edge, y + h + 1, x);
+    for (auto i = 1; i <= h; i++) {
+        c_put_str(TERM_WHITE, "|" + std::string(w, ' ') + "|", y + i, x);
+    }
+
+    if (!title.empty()) {
+        c_put_str(TERM_YELLOW, title.substr(0, w), y + 1, x + 1);
+    }
+
+    for (auto i = 0; i < static_cast<int>(text.size()); i++) {
+        const auto line = ((i == cur) ? "> " : "  ") + text[i];
+        c_put_str((i == cur) ? TERM_L_BLUE : TERM_WHITE, line.substr(0, w), top + i, x + 1);
+    }
+
+    x += w + 2;
+    return top;
+}
+
+/*
+ * A boxed menu (see box_draw()).  keys[i] (0 = none) chooses entry i
+ * directly.  2/8 (arrows) move, Enter/Space/5/6 choose, Escape/0/4 go back.
+ * Returns the chosen entry or -1.
+ */
+int box_menu(int x, int y, std::string_view title, const std::vector<std::string> &text, const std::string &keys, int cur)
+{
+    const auto n = static_cast<int>(text.size());
+    if (n <= 0) {
+        return -1;
+    }
+
+    if ((cur < 0) || (cur >= n)) {
+        cur = 0;
+    }
+
     screen_save();
-    auto old_num = 0;
     while (true) {
-        if (this->menu_num == 0) {
-            old_num = this->num;
+        auto bx = x;
+        auto by = y;
+        (void)box_draw(bx, by, title, text, cur);
+        const auto k = inkey();
+        const auto pos = (k != 0) ? keys.find(k) : std::string::npos;
+        if ((pos != std::string::npos) && (static_cast<int>(pos) < n)) {
+            cur = static_cast<int>(pos);
+            break;
         }
 
-        this->make_commands_frame();
-        this->max_num = this->get_command_per_menu_num();
-        this->is_max_num_odd = (max_num % 2) == 1;
-        put_str(_("》", "> "), this->base_y + 1 + this->num / 2, this->base_x + 2 + (this->num % 2) * 24);
-        move_cursor_relative(this->player_ptr->y, this->player_ptr->x);
-        this->sub_cmd = inkey();
-        if ((this->sub_cmd == ' ') || (this->sub_cmd == 'x') || (this->sub_cmd == 'X') || (this->sub_cmd == '\r') || (this->sub_cmd == '\n')) {
-            if (this->check_continuous_command()) {
-                break;
-            }
-
-            continue;
+        if ((k == ESCAPE) || (k == '0') || (k == '4')) {
+            cur = -1;
+            break;
         }
 
-        if ((this->sub_cmd == ESCAPE) || (this->sub_cmd == 'z') || (this->sub_cmd == 'Z') || (this->sub_cmd == '0')) {
-            if (this->check_escape_key(old_num)) {
-                break;
-            }
-
-            continue;
+        if ((k == '\r') || (k == '\n') || (k == ' ') || (k == '5') || (k == '6')) {
+            break;
         }
 
-        if (this->process_down_cursor() || this->process_up_cursor()) {
-            continue;
+        if (k == '8') {
+            cur = (cur + n - 1) % n;
         }
 
-        this->process_right_left_cursor();
+        if (k == '2') {
+            cur = (cur + 1) % n;
+        }
     }
 
     screen_load();
-    if (inkey_next == nullptr) {
-        inkey_next = "";
+    return cur;
+}
+
+/*
+ * The command menu: groups, then the group's commands with their keys in
+ * the current keyset.  Returns an underlying command or ESCAPE.
+ */
+char InputKeyRequestor::inkey_from_menu()
+{
+    static int group = 0;
+    std::vector<std::string> gtext;
+    std::string gkeys;
+    std::vector<size_t> gstart;
+    for (size_t i = 0; i < menu_info.size(); i++) {
+        if (menu_info[i].cmd) {
+            continue;
+        }
+
+        const auto label = static_cast<char>(I2A(gstart.size()));
+        gstart.push_back(i + 1);
+        gtext.push_back(std::string{ label, ')', ' ' } + menu_info[i].name);
+        gkeys += label;
     }
 
-    return this->command;
+    prt("", 0, 0);
+    while (true) {
+        group = box_menu(1, 1, _("コマンド", "Commands"), gtext, gkeys, group);
+        if (group < 0) {
+            group = 0;
+            return ESCAPE;
+        }
+
+        size_t nw = 0;
+        auto end = gstart[group];
+        for (; (end < menu_info.size()) && menu_info[end].cmd; end++) {
+            nw = std::max(nw, std::string_view(menu_info[end].name).size());
+        }
+
+        std::vector<std::string> ctext;
+        std::string ckeys, cmds;
+        for (auto i = gstart[group]; i < end; i++) {
+            const auto cmd = static_cast<char>(menu_info[i].cmd);
+            auto name = std::string(menu_info[i].name);
+            name.resize(nw, ' ');
+            cmds += cmd;
+            ckeys += command_key(cmd);
+            ctext.push_back(name + "  " + command_key_str(cmd));
+        }
+
+        /* The group box stays under the command box */
+        screen_save();
+        auto bx = 1;
+        auto by = 1;
+        (void)box_draw(bx, by, _("コマンド", "Commands"), gtext, group);
+        const auto chosen = box_menu(bx, by + 1 + group, menu_info[gstart[group] - 1].name, ctext, ckeys, 0);
+        screen_load();
+        if (chosen >= 0) {
+            use_menu = true;
+            if (inkey_next == nullptr) {
+                inkey_next = ""; /* underlying command: no keymap */
+            }
+
+            return cmds[chosen];
+        }
+    }
 }
 
 char InputKeyRequestor::input_repeat_num()
@@ -337,155 +488,5 @@ void InputKeyRequestor::confirm_command(const tl::optional<std::string> &inscrip
         }
 
         s = angband_strchr(s + 1, '^');
-    }
-}
-
-void InputKeyRequestor::make_commands_frame() const
-{
-    auto line = 0;
-    put_str("+----------------------------------------------------+", this->base_y + line++, this->base_x);
-    put_str("|                                                    |", this->base_y + line++, this->base_x);
-    put_str("|                                                    |", this->base_y + line++, this->base_x);
-    put_str("|                                                    |", this->base_y + line++, this->base_x);
-    put_str("|                                                    |", this->base_y + line++, this->base_x);
-    put_str("|                                                    |", this->base_y + line++, this->base_x);
-    put_str("+----------------------------------------------------+", this->base_y + line++, this->base_x);
-}
-
-std::string InputKeyRequestor::switch_special_menu_condition(const SpecialMenuContent &special_menu) const
-{
-    switch (special_menu.menu_condition) {
-    case SpecialMenuType::NONE:
-        return "";
-    case SpecialMenuType::CLASS:
-        if (PlayerClass(this->player_ptr).equals(*special_menu.class_condition)) {
-            return std::string(special_menu.name);
-        }
-
-        return "";
-    case SpecialMenuType::WILD: {
-        const auto &floor = *this->player_ptr->current_floor_ptr;
-        if (floor.is_underground() || floor.inside_arena) {
-            return "";
-        }
-
-        if (special_menu.matches_current_wild_mode()) {
-            return std::string(special_menu.name);
-        }
-
-        return "";
-    }
-    default:
-        THROW_EXCEPTION(std::logic_error, "Invalid SpecialMenuType is specified!");
-    }
-}
-
-int InputKeyRequestor::get_command_per_menu_num()
-{
-    int command_per_menu_num;
-    for (command_per_menu_num = 0; command_per_menu_num < MAX_COMMAND_PER_SCREEN; command_per_menu_num++) {
-        if (menu_info[this->menu_num][command_per_menu_num].cmd == 0) {
-            break;
-        }
-
-        std::string menu_name(menu_info[this->menu_num][command_per_menu_num].name);
-        for (const auto &special_menu : special_menu_info) {
-            if (special_menu.name[0] == '\0') {
-                break;
-            }
-
-            if ((this->menu_num != special_menu.window) || (command_per_menu_num != special_menu.number)) {
-                continue;
-            }
-
-            auto tmp_menu_name = this->switch_special_menu_condition(special_menu);
-            if (tmp_menu_name != "") {
-                menu_name = tmp_menu_name;
-            }
-        }
-
-        put_str(menu_name, this->base_y + 1 + command_per_menu_num / 2, this->base_x + 4 + (command_per_menu_num % 2) * 24);
-    }
-
-    return command_per_menu_num;
-}
-
-bool InputKeyRequestor::check_continuous_command()
-{
-    if (menu_info[this->menu_num][this->num].fin) {
-        this->command = menu_info[this->menu_num][this->num].cmd;
-        use_menu = true;
-        return true;
-    }
-
-    this->menu_num = menu_info[this->menu_num][this->num].cmd;
-    this->num = 0;
-    this->base_y += 2;
-    this->base_x += 8;
-    return false;
-}
-
-bool InputKeyRequestor::check_escape_key(const int old_num)
-{
-    if (this->menu_num == 0) {
-        this->command = ESCAPE;
-        return true;
-    }
-
-    this->menu_num = 0;
-    this->num = old_num;
-    this->base_y -= 2;
-    this->base_x -= 8;
-    screen_load();
-    screen_save();
-    return false;
-}
-
-bool InputKeyRequestor::process_down_cursor()
-{
-    if ((this->sub_cmd != '2') && (this->sub_cmd != 'j') && (this->sub_cmd != 'J')) {
-        return false;
-    }
-
-    if (!this->is_max_num_odd) {
-        this->num = (this->num + 2) % this->max_num;
-        return true;
-    }
-
-    auto tmp_num = this->num % 2 ? this->max_num - 1 : this->max_num + 1;
-    this->num = (this->num + 2) % tmp_num;
-    return true;
-}
-
-bool InputKeyRequestor::process_up_cursor()
-{
-    if ((this->sub_cmd != '8') && (this->sub_cmd != 'k') && (this->sub_cmd != 'K')) {
-        return false;
-    }
-
-    if (!this->is_max_num_odd) {
-        this->num = (this->num + this->max_num - 2) % this->max_num;
-        return true;
-    }
-
-    auto is_num_odd = (this->num % 2) != 0;
-    auto tmp_num1 = is_num_odd ? (this->num + max_num - 3) : (this->num + this->max_num - 1);
-    auto tmp_num2 = is_num_odd ? (this->max_num - 1) : (this->max_num + 1);
-    this->num = tmp_num1 % tmp_num2;
-    return true;
-}
-
-void InputKeyRequestor::process_right_left_cursor()
-{
-    auto orig_key_right_left = (this->sub_cmd == '4') || (this->sub_cmd == '6');
-    auto rogue_key_right_left = (this->sub_cmd == 'h') || (this->sub_cmd == 'H') || (this->sub_cmd == 'l') || (this->sub_cmd == 'L');
-    if (!orig_key_right_left && !rogue_key_right_left) {
-        return;
-    }
-
-    if ((this->num % 2) || (this->num == max_num - 1)) {
-        this->num--;
-    } else if (this->num < max_num - 1) {
-        this->num++;
     }
 }

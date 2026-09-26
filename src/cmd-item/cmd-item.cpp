@@ -42,6 +42,16 @@
 #include "object-use/zapwand-execution.h"
 #include "object/item-tester-hooker.h"
 #include "object/item-use-flags.h"
+#include "inventory/floor-item-getter.h"
+#include "inventory/inventory-util.h"
+#include "object-hook/hook-armor.h"
+#include "object-hook/hook-expendable.h"
+#include "object/object-info.h"
+#include "sv-definition/sv-lite-types.h"
+#include "term/term-color-types.h"
+#include "util/enum-converter.h"
+#include "util/finalizer.h"
+#include <algorithm>
 #include "perception/identification.h"
 #include "perception/object-perception.h"
 #include "player-base/player-class.h"
@@ -70,38 +80,248 @@
 #include "view/display-messages.h"
 #include "world/world.h"
 
+/************************************************************************
+ * RVIP: item menus in the inventory/equipment list (i/e)
+ * Letter = main action, Shift+letter = drop, Ctrl+letter = examine,
+ * 2/8 move the cursor, 4/6 switch list, Enter/Space/5 = menu of every action
+ * that fits the cursor's item, + - * = main/drop/examine of that item,
+ * Esc/0/. close, any other key is a normal command.  An action runs the
+ * game's own command (queued past the keymaps) with the item preselected
+ * for its first item prompt (item_preselect in get_item_floor()); the list
+ * reopens afterwards (player-processor.cpp) unless a hostile is in view.
+ ***********************************************************************/
+char gear_reopen = 0; /* 'i' or 'e': reopen that list after the action */
+
+namespace {
+bool can_refuel(PlayerType *player_ptr, const ItemEntity &item)
+{
+    const auto &lite = *player_ptr->inventory[INVEN_LITE];
+    if (lite.bi_key.tval() != ItemKindType::LITE) {
+        return false;
+    }
+
+    if (lite.bi_key.sval() == SV_LITE_LANTERN) {
+        return item.can_refill_lantern();
+    }
+
+    return (lite.bi_key.sval() == SV_LITE_TORCH) && item.can_refill_torch();
+}
+
+bool is_book(PlayerType *player_ptr, const ItemEntity &item)
+{
+    return item.is_spell_book() && check_book_realm(player_ptr, item.bi_key);
+}
+
+bool is_tval(const ItemEntity &item, ItemKindType tval)
+{
+    return item.bi_key.tval() == tval;
+}
+
+struct GearAction {
+    char key; /* underlying command (keyset 0) */
+    const char *name;
+    BIT_FLAGS where; /* USE_INVEN / USE_EQUIP, as the command's own choose_item() */
+    bool (*test)(PlayerType *, const ItemEntity &); /* the command's own item tester */
+    bool main; /* candidate for the letter's main action (first fit wins) */
+};
+
+/* Main actions first, in the order the main action is picked */
+const GearAction gear_actions[] = {
+    { 'q', "Quaff", USE_INVEN, [](auto p, auto &o) { return item_tester_hook_quaff(p, &o); }, true },
+    { 'r', "Read", USE_INVEN, [](auto, auto &o) { return o.is_readable(); }, true },
+    { 'u', "Use", USE_INVEN, [](auto, auto &o) { return is_tval(o, ItemKindType::STAFF); }, true },
+    { 'a', "Aim", USE_INVEN, [](auto, auto &o) { return is_tval(o, ItemKindType::WAND); }, true },
+    { 'z', "Zap", USE_INVEN, [](auto, auto &o) { return is_tval(o, ItemKindType::ROD); }, true },
+    { 'E', "Eat", USE_INVEN, [](auto p, auto &o) { return item_tester_hook_eatable(p, &o); }, true }, /* after the devices: some races eat staffs and wands */
+    { 'm', "Cast a spell", USE_INVEN, [](auto p, auto &o) { return is_book(p, o); }, true },
+    { 'w', "Wear/wield", USE_INVEN, [](auto p, auto &o) { return item_tester_hook_wear(p, &o); }, true },
+    { 't', "Take off", USE_EQUIP, [](auto, auto &) { return true; }, true },
+    { 'F', "Refuel", USE_INVEN, [](auto p, auto &o) { return can_refuel(p, o); }, true },
+    { 'b', "Browse", USE_INVEN, [](auto p, auto &o) { return is_book(p, o); }, false },
+    { 'A', "Activate", USE_EQUIP, [](auto, auto &o) { return o.is_activatable(); }, false },
+    { 'f', "Fire", USE_INVEN, [](auto p, auto &o) { return (p->tval_ammo != ItemKindType::NONE) && is_tval(o, p->tval_ammo); }, false },
+    { 'v', "Throw", USE_INVEN | USE_EQUIP, [](auto, auto &) { return true; }, false },
+    { 'd', "Drop", USE_INVEN | USE_EQUIP, [](auto, auto &) { return true; }, false },
+    { 'k', "Destroy", USE_INVEN, [](auto, auto &) { return true; }, false },
+    { '{', "Inscribe", USE_INVEN | USE_EQUIP, [](auto, auto &) { return true; }, false },
+    { '}', "Uninscribe", USE_INVEN | USE_EQUIP, [](auto, auto &o) { return o.is_inscribed(); }, false },
+    { 'I', "Examine", USE_INVEN | USE_EQUIP, [](auto, auto &) { return true; }, false },
+};
+
+bool gear_action_ok(PlayerType *player_ptr, const GearAction &act, short i_idx)
+{
+    const auto &item = *player_ptr->inventory[i_idx];
+    const auto where = (i_idx >= INVEN_MAIN_HAND) ? USE_EQUIP : USE_INVEN;
+    return item.is_valid() && (act.where & where) && act.test(player_ptr, item);
+}
+
+char gear_main(PlayerType *player_ptr, short i_idx)
+{
+    for (const auto &act : gear_actions) {
+        if (act.main && gear_action_ok(player_ptr, act, i_idx)) {
+            return act.key;
+        }
+    }
+
+    return 'I';
+}
+
+/* The action menu: a box left of the list, at the item's row; returns a command or 0 */
+char gear_menu(PlayerType *player_ptr, short i_idx, int row)
+{
+    std::vector<std::string> text;
+    std::string keys, cmds;
+    for (const auto &act : gear_actions) {
+        if (!gear_action_ok(player_ptr, act, i_idx)) {
+            continue;
+        }
+
+        auto name = std::string(act.name);
+        name.resize(12, ' ');
+        cmds += act.key;
+        keys += command_key(act.key);
+        text.push_back(name + command_key_str(act.key));
+    }
+
+    auto title = describe_flavor(player_ptr, *player_ptr->inventory[i_idx], 0);
+    if (title.size() > 40) {
+        title.resize(40);
+    }
+
+    const auto chosen = box_menu(1, row, title, text, keys, 0);
+    return (chosen < 0) ? 0 : cmds[chosen];
+}
+}
+
+/*!
+ * @brief The inventory (equip = false) or equipment list with a cursor and item menus
+ */
+void gear_ui(PlayerType *player_ptr, bool equip)
+{
+    static int cursor = 0;
+    while (true) {
+        command_wrk = equip ? true : false;
+        if (easy_floor) {
+            command_wrk = equip ? USE_EQUIP : USE_INVEN;
+        }
+
+        /* Rows: every equipment slot, or the (packed) inventory */
+        auto rows = 0;
+        const auto first = equip ? static_cast<short>(INVEN_MAIN_HAND) : static_cast<short>(0);
+        if (equip) {
+            rows = INVEN_TOTAL - INVEN_MAIN_HAND;
+        } else {
+            for (const auto i_idx : INVEN_PACK_SLOTS) {
+                if (player_ptr->inventory[i_idx]->is_valid()) {
+                    rows = enum2i(i_idx) + 1;
+                }
+            }
+        }
+
+        cursor = (rows > 0) ? std::clamp(cursor, 0, rows - 1) : 0;
+        screen_save();
+        const auto restore = util::make_finalizer([] { screen_load(); }); /* the list stays under the action menu */
+        if (equip) {
+            (void)show_equipment(player_ptr, 0, USE_FULL, AllMatchItemTester());
+        } else {
+            (void)show_inventory(player_ptr, 0, USE_FULL, AllMatchItemTester());
+        }
+
+        if ((rows > 0) && (command_gap >= 1)) {
+            c_put_str(TERM_L_BLUE, ">", cursor + 1, command_gap - 1);
+        }
+
+        const auto weight = calc_inventory_weight(player_ptr);
+        const auto weight_lim = calc_weight_limit(player_ptr);
+        const auto percentage = weight * 100 / weight_lim;
+#ifdef JP
+        const auto mes = format("%s： 合計 %3d.%1d kg (限界の%d%%) 文字:使う Shift:落とす Ctrl:調べる Enter:メニュー", equip ? "装備" : "持ち物", lb_to_kg_integer(weight), lb_to_kg_fraction(weight), percentage);
+#else
+        const auto mes = format("%s (%d.%d lb, %d%%): letter use, Shift drop, Ctrl examine, Enter menu",
+            equip ? "Equipment" : "Inventory", weight / 10, weight % 10, percentage);
+#endif
+        prt(mes, 0, 0);
+        const auto key = inkey();
+
+        const auto labels = prepare_label_string(player_ptr, equip ? USE_EQUIP : USE_INVEN, AllMatchItemTester());
+        auto label_slot = [&](char c) -> short {
+            const auto pos = labels.find(c);
+            return ((pos == std::string::npos) || (static_cast<int>(pos) >= rows)) ? -1 : static_cast<short>(first + pos);
+        };
+
+        short i_idx = -1;
+        char cmd = 0;
+        const auto ukey = static_cast<unsigned char>(key);
+        if ((key == ESCAPE) || (key == '0') || (key == '.')) {
+            if (key == ESCAPE) {
+                const auto &[wid, hgt] = term_get_size();
+                command_gap = wid - 30;
+            }
+
+            return;
+        } else if ((key == '2') || (key == '8')) {
+            if (rows > 0) {
+                cursor = (cursor + ((key == '2') ? 1 : rows - 1)) % rows;
+            }
+
+            continue;
+        } else if ((key == '4') || (key == '6')) {
+            equip = !equip;
+            cursor = 0;
+            continue;
+        } else if ((key == '\r') || (key == '\n') || (key == ' ') || (key == '5') || (key == '+') || (key == '-') || (key == '*')) {
+            if (rows == 0) {
+                continue;
+            }
+
+            i_idx = first + cursor;
+            if (!player_ptr->inventory[i_idx]->is_valid()) {
+                continue;
+            }
+
+            if (key == '+') {
+                cmd = gear_main(player_ptr, i_idx);
+            } else if (key == '-') {
+                cmd = 'd';
+            } else if (key == '*') {
+                cmd = 'I';
+            } else {
+                cmd = gear_menu(player_ptr, i_idx, cursor + 1);
+                if (!cmd) {
+                    continue;
+                }
+            }
+        } else if ((i_idx = label_slot(key)) >= 0) {
+            cmd = gear_main(player_ptr, i_idx);
+        } else if ((ukey < 128) && isupper(ukey) && ((i_idx = label_slot(static_cast<char>(tolower(ukey)))) >= 0)) {
+            cmd = 'd';
+        } else if ((ukey >= 1) && (ukey <= 26) && ((i_idx = label_slot(static_cast<char>(ukey + 'a' - 1))) >= 0)) {
+            cmd = 'I';
+        } else {
+            /* Any other key is a normal command, as before */
+            command_new = key;
+            command_see = true;
+            return;
+        }
+
+        if ((i_idx < 0) || !player_ptr->inventory[i_idx]->is_valid()) {
+            continue;
+        }
+
+        cursor = i_idx - first;
+        item_preselect = i_idx;
+        queue_raw_command(cmd);
+        gear_reopen = equip ? 'e' : 'i';
+        return;
+    }
+}
+
 /*!
  * @brief 持ち物一覧を表示するコマンドのメインルーチン / Display inventory_list
  */
 void do_cmd_inven(PlayerType *player_ptr)
 {
-    command_wrk = false;
-    if (easy_floor) {
-        command_wrk = USE_INVEN;
-    }
-
-    screen_save();
-    (void)show_inventory(player_ptr, 0, USE_FULL, AllMatchItemTester());
-    const auto weight = calc_inventory_weight(player_ptr);
-    const auto weight_lim = calc_weight_limit(player_ptr);
-    const auto percentage = weight * 100 / weight_lim;
-#ifdef JP
-    const auto mes = format("持ち物： 合計 %3d.%1d kg (限界の%d%%) コマンド: ", lb_to_kg_integer(weight), lb_to_kg_fraction(weight), percentage);
-#else
-    const auto mes = format("Inventory: carrying %d.%d pounds (%d%% of capacity). Command: ", weight / 10, weight % 10, percentage);
-#endif
-
-    prt(mes, 0, 0);
-    command_new = inkey();
-    screen_load();
-    if (command_new != ESCAPE) {
-        command_see = true;
-        return;
-    }
-
-    const auto &[wid, hgt] = term_get_size();
-    command_new = 0;
-    command_gap = wid - 30;
+    gear_ui(player_ptr, false);
 }
 
 /*!

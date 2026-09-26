@@ -513,7 +513,7 @@
 			c.strokeRect(x * T.cw + 0.5, y * T.ch + 0.5, w * T.cw - 1, T.ch - 1);
 		},
 
-		fresh: function (t) { if (!t) RvipWM.prompt.text(row0.join('')); },   /* the message line over the map */
+		fresh: function (t) { if (!t) RvipWM.prompt.text(Array.from(row0, function (c) { return c || ' '; }).join('')); },   /* the message line over the map (unwritten cells are blanks) */
 
 		bell: function () { },
 

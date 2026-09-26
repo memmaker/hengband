@@ -226,3 +226,95 @@
   `~/Games/frogcomposband/lib/xtra/graf/16x16.bmp` (same Adam Bolt sheet)
   with Frog's `lib/pref/graf-new.prf`, remapped to Hengband's JSON ids
   (`R:`/`K:`/`F:` by id, see stage 1).
+
+### Stage 3 (Enter menu + inventory): done 2026-09-26
+- **Enter menu**: Hengband's own `InputKeyRequestor::inkey_from_menu()`
+  (`src/io/input-key-requester.cpp`) rewritten as Frog's/Zangband's
+  `cmd_menu()`: the old fixed 2-column frame (`make_commands_frame()`,
+  cursor helpers, `special_menu_info`, class/wild names) is gone. Same call
+  site in `get_command()`: Enter / `x` when `command_menu` is on and no
+  keymap uses the key (`pref-key.prf` `^J` → `\r` opens it too). Data:
+  `src/cmd-io/cmd-menu-content-table.cpp` `menu_info` is now one flat
+  `std::vector<menu_content>` (`{name, cmd}`, cmd 0 = group), 15 groups as
+  `lib/help/commdesc.txt` groups them, incl. `X` explore, `<`/`>`, travel
+  `` ` ``, repeat `n`, pets, ^I, screen dumps, ^V. Boxes: free functions
+  `box_draw()` / `box_menu()` (sized to content, moved to fit, no
+  scrolling); keys of the current keyset: `command_key()` /
+  `command_key_str()` (reverse lookup in `keymap_actions_map`; roguelike
+  shows `^D`, `T`, `,`; explore has no roguelike key, pick it by cursor).
+  2/8/arrows move, Enter/Space/5/6 choose, group letter or command key
+  chooses, Esc/0/4 back. The chosen underlying command skips keymaps
+  (`inkey_next = ""`) and sets `use_menu` (the game's own cursor item
+  prompts), runs through `process_command()`.
+- **Item menus**: `i`/`e` = `gear_ui(player, equip)` in
+  `src/cmd-item/cmd-item.cpp` (`do_cmd_inven()`, and `do_cmd_equip()` in
+  `cmd-equipment.cpp`, just call it). Drawn by the game's
+  `show_inventory()` / `show_equipment()` + a `>` at `command_gap - 1`.
+  Letter = main action (`gear_main()`: first fitting of quaff, read, use
+  staff, aim, zap, eat, cast (book), wear/wield, take off, refuel, else
+  examine; eat comes after the devices because MANA-food races can eat
+  staffs), Shift+letter drop, Ctrl+letter examine, 2/8 cursor, 4/6 switch
+  list, Enter/Space/5 = `gear_menu()` (a `box_menu()` of every fitting
+  action in `gear_actions[]`: eat, quaff, read, use, aim, zap, cast,
+  wear/wield, take off, refuel, browse, activate, fire, throw, drop,
+  destroy, inscribe, uninscribe, examine, each with the same
+  `USE_INVEN/USE_EQUIP` places and item tester as the command's own
+  `choose_item()` call), `+ - *` main/drop/examine of the cursor item,
+  Esc/0/. close, any other key is a normal command (as before).
+- **How item actions run (key queue + preselect)**: the list sets
+  `item_preselect = i_idx` (`inventory/floor-item-getter.h`),
+  `queue_raw_command(key)` (`command_new` + `command_raw` → no keymap in
+  `get_command()`) and `gear_reopen = 'i'/'e'`, then closes. The command
+  runs through `process_command()`; the first `get_item_floor()` takes the
+  preselect if the item is in its places and passes its tester (then
+  `repeat_push()`s it, so `n` repeats) and always clears it.
+  `core/player-processor.cpp` before `request_command()`: queues
+  `gear_reopen` unless `hostile_monster_in_view()` (new wrapper in
+  `cmd-explore.cpp`, the explore stop test); after `process_command()`
+  clears the preselect unless a command is queued.
+- **Web fixes found on the way** (stage 1 bugs): `main-web.cpp` pushed
+  JS keys with `term_key_push()`, which puts keys in *front*: every
+  multi-key event (arrow/keypad/F-key macro triggers `^_..._FF54\r`) came
+  in reversed and ran as junk keys (`_` opened the autopick editor). Now
+  `web_keypress()` appends FIFO. `hengband.js` `fresh()`: cells of row 0
+  the game never wrote were holes in `row0`, so the prompt line lost its
+  spaces ("Savefiledoesnotexist"): holes are blanks now.
+- Tested in the browser (own tab, 127.0.0.1): Enter menu by arrows
+  (Resting box), by letters (`b` `X` → explore ran), Esc; items (Skeleton
+  Weaponsmith; Potions of Water + Ration at the General Store, Phase Door
+  at the Alchemist, reached by look `l` → `g`): wield torch (menu `w`),
+  take off (letter in `e`, list reopened, cursor on the item), quaff
+  (letter), drop (Shift, quantity prompt), examine (Ctrl), use staff
+  (menu `u`), read (menu, cursor + Enter); roguelike (`"` 
+  `Y:rogue_like_commands`): menu shows `T`, `^D`, `,`, `;`; `T` from the
+  menu runs take off; take off by letter in `e`; explore from the menu by
+  cursor. Test IDBFS databases (`/hengband/lib/*`) deleted.
+- ASan (native gcu build, stage 1's pty driver with Enter x12, `i`/`e`
+  x10, 2/4/6/8, arrows, `X`, `<`/`>` added to the key pool; seeds 21-27,
+  3000 keys new + 2000 after restore): two upstream bugs, each fixed in
+  its own `port:` commit: `230c6c467` `term/z-term.cpp` `term_erase()`
+  stepped to column -1 when column 0 held attr 0xFF (colour menu `&` `3`
+  lets the index wrap to 255, which looks like AF_BIGTILE2); `d894bd0b9`
+  `cmd-action/cmd-racial.cpp` `U` `/` + letter redrew the list at page -1
+  (`power_desc[-15]`). Then clean (seeds 22, 24-27). Build deleted.
+- Open problems: the web prompt line (a DOM overlay, `rvip-wm.js`) wraps
+  and covers the first rows of the `i`/`e` list (stage 5 layout); the
+  reopened list hides the action's message (messages window / `^P`); the
+  action menu box sits at the left over the side panel and can cover the
+  list's labels on a narrow term; every item prompt does not get a cursor
+  (only prompts of commands picked from the Enter menu, the game's own
+  `use_menu` mode); Tab/^I, ^J, ^M in the list are Enter/examine keys,
+  not commands; the sub-windows still show the wrong content (stage 1).
+
+### Next: stage 4 (tiles)
+- **Adam Bolt 16x16, the user's explicit choice** (the 95% rule is waived
+  for this game; gaps get same-set stand-ins, never a second set). Source:
+  `~/Games/frogcomposband/lib/xtra/graf/16x16.bmp` (the sheet Hengband's
+  `graf-new.prf` was made for; never in Hengband's git) with Frog's
+  `lib/pref/graf-new.prf`, remapped to Hengband's JSON ids (`R:<monrace
+  id>`, `K:<baseitem id>`, `F:<terrain id>[:LIT]`; `web/tile-coverage.py`
+  knows the id scheme and the `*Definitions.jsonc` files).
+- Loader: the template's `js_pict` path in `src/main-web.cpp` (Frog's
+  `main-web.c`), `hengband.js` `pict()` already draws from `tiles.webp`
+  (load disabled, l.~806) and the Tiles button is hidden: enable both;
+  nearest-neighbour at cell size; Tiles on/off button.
