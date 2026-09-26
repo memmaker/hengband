@@ -117,7 +117,8 @@ std::filesystem::path path_parse(const std::filesystem::path &path)
     }
 
     if (pw == nullptr) {
-        THROW_EXCEPTION(std::runtime_error, "Failed to get User ID!");
+        /* Unknown user (e.g. "~foo" typed at a file prompt): leave the path as it is, the open fails normally */
+        return file;
     }
 
     if (s == nullptr) {
