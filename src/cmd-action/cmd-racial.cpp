@@ -61,6 +61,11 @@ static void racial_power_erase_cursor(rc_type *rc_ptr)
  */
 static void racial_power_display_list(PlayerType *player_ptr, rc_type *rc_ptr)
 {
+    /* port: the list was never shown yet (page -1, e.g. after browsing with '/'): show page 0, not power_desc[-15..] */
+    if (rc_ptr->page < 0) {
+        rc_ptr->page = 0;
+    }
+
     TERM_LEN x = 11;
     prt(_("                                   Lv   MP 失率 効果", "                                   Lv   MP Fail Effect"), 1, x);
     auto y = 0;
@@ -236,7 +241,7 @@ static bool racial_power_interpret_choise(PlayerType *player_ptr, rc_type *rc_pt
 
     if (rc_ptr->choice == ' ' || rc_ptr->choice == '*') {
         rc_ptr->page++;
-        if (rc_ptr->page > rc_ptr->max_page) {
+        if (rc_ptr->page >= rc_ptr->max_page) {
             rc_ptr->page = 0;
         }
 
