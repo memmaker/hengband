@@ -617,3 +617,35 @@
   `js_quit(msg, p_ptr->is_dead)` in `src/main-web.cpp`; score code in
   `src/io/` / `core/`; worked example FrogComposband stage 9
   (`files.c close_game()`).
+
+### Stage 9 — graveyard + leaderboard (done) 2026-09-26
+- Hook: `src/core/game-closer.cpp` `close_game()`, right after
+  `check_death()` says the run is over (before `kingly()`/tombstone) →
+  `web_run_end(PlayerType *)` (`#ifdef USE_WEB`, extern) in
+  `src/main-web.cpp` → `js_beacon` EM_JS → `RvipWM.report`.
+- ev: `world.total_winner` → win (checked first: retire and winner
+  seppuku keep it; a winner killed later has it cleared by `take_hit()`,
+  the game itself counts that as a death); `died_from` "Quitting" (`Q y @`
+  suicide), "Interrupting"/"Abortion" (signals) → quit; else death.
+  Ctrl-X save = no run end, no beacon.
+- Fields sent: g=hengband, ev, name=`player_ptr->name`, killer=`died_from`
+  (death only) with " while paralyzed"/" while being the statue",
+  "hallucinatingly distorted " and a/an/the/The stripped,
+  depth=`dun_level`, score=`calc_score()` (what `top_twenty()` stores),
+  turns=`get_real_turns(game_turn)` (as the score file), lvl=`lev`.
+  Missing: none. Name is "PLAYER" when the birth name prompt is skipped.
+  Licence clause (3) (no sends to Hengband's score server) is kept:
+  `-DDISABLE_NET`, the beacon goes only to ruzzoli.de.
+- Killer art: roguelikes-index `885eee9` `killers/make.py` `hengband()`,
+  1400 PNGs from `web/tiles.webp` via `graf-new.prf` + `graf-ab.prf`,
+  names from `MonraceDefinitions.jsonc`, "The " dropped. Deployed.
+- Tested: local (127.0.0.1, patched fetch) death (`"` `Y:allow_debug_opts`,
+  `^A y n`, Tab, `783` Enter, `,` until dead) →
+  `ev=death&killer=Great%20Wyrm%20of%20Chaos`; quit with beacon 503 → URL
+  with id/at in outbox, 204 + `RvipWM.flush()` → same URL, outbox empty;
+  win via a temporary build setting `total_winner` in `do_cmd_suicide()`
+  (reverted, rebuilt) → `ev=win`. Live (https://ruzzoli.de, real fetch):
+  quit and death both answered 204, outbox `[]`. IDBFS `/hengband/*`
+  deleted on both origins. Real Serpent kill not tested.
+
+### Next: RVIP complete (stage 9 was the last)
