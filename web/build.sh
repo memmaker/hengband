@@ -8,11 +8,14 @@ cd "$(dirname "$0")/.."
 OUT=web/dist OBJ=web/obj
 rm -rf "$OUT" web/stage && mkdir -p "$OUT" web/stage/lib "$OBJ"
 
-mkdir -p "$OUT/music" && cp ../quickband/web/music/new_town.ogg "$OUT/music/"
+# Music: Hengband's own tracks (lib/xtra submodule, CC0 / CC BY, see
+# lib/xtra/music/readme.txt), town + dungeon low/med/high as music.cfg
+mkdir -p "$OUT/music" && cp lib/xtra/music/readme.txt lib/xtra/music/town[1-5].mp3 lib/xtra/music/dun_*[1-5].mp3 "$OUT/music/"
 
 # Game files (English build: the *_j / j* files stay in, they are small)
 for d in edit file help pref; do cp -R lib/$d web/stage/lib/; done
-mkdir -p web/stage/lib/xtra/sound && cp lib/xtra/sound/sound.cfg web/stage/lib/xtra/sound/ 2>/dev/null || true
+# Sound: web sound.cfg into the preload (never fetch a .cfg), used CC0 wavs to dist/sound
+mkdir -p web/stage/lib/xtra/sound && python3 web/sounds.py web/stage/lib/xtra/sound/sound.cfg "$OUT/sound" && cp lib/xtra/sound/readme.txt "$OUT/sound/"
 for d in data info save user apex bone script; do mkdir -p web/stage/lib/$d; done
 # auto_more + skip_more (RVIP 3d: Hengband's auto_more still stops when the
 # message window overflows, skip_more never stops) and center_player are on for new web characters; the
@@ -41,7 +44,7 @@ em++ -O2 -fexceptions $OBJ/*.o -o "$OUT/hengband-core.js" \
 	--preload-file web/stage/lib@/hengband/lib
 
 cp web/index.html "$HOME/Games/rvip-tools/web/rvip-wm.js" web/hengband.js web/tiles.webp "$OUT/"
-# Help: stub until stage 6 (make-help.py)
-echo '<h2>Hengband</h2><p>The full guide comes with the docs (stage 6). In-game help: <kbd>?</kbd>. Command menu: <kbd>Enter</kbd>. Explore: <kbd>X</kbd>. Save: <kbd>Ctrl-S</kbd>, save and quit: <kbd>Ctrl-X</kbd>.</p>' > "$OUT/help.html"
+# Help: the game guide from the Docs (~/Desktop/Games/Roguelikes/Docs)
+python3 web/make-help.py > "$OUT/help.html"
 rm -rf web/stage
 ls -la "$OUT"

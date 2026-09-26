@@ -361,10 +361,12 @@
 		return String.fromCharCode(b);
 	}
 
-	/* Sound effects (lib/xtra/sound/sound.cfg) and town music, both off by default */
-	var audio = { sound: false, music: false, cfg: null, cache: {}, depth: -1,
-		song: new Audio('music/new_town.ogg') };
+	/* Sound effects (lib/xtra/sound/sound.cfg) and Hengband's own music
+	   (lib/xtra/music, music.cfg town / dun_low / dun_med / dun_high), both off by default */
+	var audio = { sound: false, music: false, cfg: null, cache: {}, depth: -1, group: '',
+		song: new Audio() };
 	audio.song.loop = true;
+	function musicGroup(d) { return d < 0 ? '' : d === 0 ? 'town' : d >= 80 ? 'dun_high' : d >= 40 ? 'dun_med' : 'dun_low'; }
 
 	/* Read lazily from the preloaded FS (a fetch of .cfg is served as a download) */
 	function loadSoundCfg() {
@@ -377,9 +379,15 @@
 		});
 	}
 
+	/* Same group (e.g. town -> town) keeps the song playing; a new group picks one of its 5 tracks */
 	function updateMusic() {
-		if (audio.music && audio.depth === 0) audio.song.play().catch(function () { });
-		else audio.song.pause();
+		var g = musicGroup(audio.depth);
+		if (!audio.music || !g) { audio.song.pause(); return; }
+		if (g !== audio.group) {
+			audio.group = g;
+			audio.song.src = 'music/' + (g === 'town' ? 'town' : g) + (1 + Math.floor(Math.random() * 5)) + '.mp3';
+		}
+		audio.song.play().catch(function () { });
 	}
 
 	function toggleAudio(kind) {

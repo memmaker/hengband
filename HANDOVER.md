@@ -465,3 +465,67 @@
   `~/Desktop/Games/Roguelikes/Docs/` with both keysets (original + roguelike;
   explore `X` only in the original keyset); Adam Bolt tile credit
   (`web/tiles.txt`).
+
+### Stage 6 (docs + sound): done 2026-09-26
+- **Docs** (`~/Desktop/Games/Roguelikes/Docs`, not git): `GAMES` entry
+  `hengband.html` in `build-docs.py` (before FrogComposband; essentials,
+  complete list = original + roguelike keyset parsed from
+  `lib/help/command.txt` between `***** <OriginalKeyset>` /
+  `***** <RogueKeyset>` / `***** <SpecialKeys>` (no indent); 145 keys; the
+  `>` row runs into `^Z` with one space, cut at `' ^'` in the lambda;
+  sections About / Tips / In the browser / Credits),
+  `GUIDES['hengband.html']` (first section "What makes Hengband special")
+  and `SAVING['hengband.html']` in `guides.py`. Other pages unchanged
+  (index.html gains the card). Credits from `lib/file/news.txt` +
+  `git shortlog` (Hourier, Habu, Deskull, Eric Branlund, dis-, iks);
+  licence from `lib/help/jlicense.txt` (Japanese): Moria/Angband licence
+  plus Hengband's terms for changed versions (keep notices, state
+  changes, no scores to the Hengband score server: `-DDISABLE_NET`); no
+  GPL grant, no COPYING file in the repo. Adam Bolt tiles credited.
+- **Help**: `web/make-help.py` (Frog's, `PAGE='hengband.html'`, About this
+  version: hengband/hengband master @ `bf1054199` + memmaker compare link)
+  → `$OUT/help.html` in `build.sh`. After a Docs edit: rebuild or
+  `python3 web/make-help.py > web/dist/help.html`.
+- **Sound**: Hengband's own `lib/xtra/sound` (submodule `hengband.xtra`,
+  CC0 OpenGameArt samples per `lib/xtra/sound/readme.txt`).
+  `web/sounds.py` writes the web `sound.cfg` into the preload stage from
+  upstream's cfg; the 27 events upstream leaves out/empty (`dig`,
+  `illegal`, `acid`, `heal`, `u_kill`, `ninja_*` …) borrow a close
+  upstream event's samples (`FILL`), `walk`/`unused` silent; copies the
+  70 used wavs (4.2 MB) + readme to `dist/sound`. Unreferenced wavs
+  (`se_maoudamashii_*`, `*-r.wav`, not in the readme's CC0 list) are not
+  copied.
+- **Music**: Hengband's own `lib/xtra/music` (CC0 / CC BY 3.0 / CC BY 4.0,
+  arranged by Sasahito Handa, per-track credits in its `readme.txt`,
+  copied to `dist/music/readme.txt`). `build.sh` copies `town1-5` and
+  `dun_low/med/high1-5` (20 mp3, ~45 MB); `hengband.js` `updateMusic()`
+  picks a random track of the group as `music.cfg`/`scene-table-floor.cpp`:
+  depth 0 town, 1-39 `dun_low`, 40-79 `dun_med`, 80+ `dun_high`; same
+  group keeps the song. No `../quickband` read any more. C++ unchanged.
+- Tested (own tab, 127.0.0.1:8791): fresh origin → Sound off / Music off;
+  Help shows the guide (About … Credits, About this version); birth
+  (Human Warrior, autoroller `n`+`2` ×6, Enter ×4); Music on (real click)
+  in town → `music/town5.mp3` 200; Sound on (real click) → `E a` →
+  `sound/eat2.wav` 200; reload → both still on; no console errors. IDBFS
+  `/hengband/lib/*` deleted. No C++ change, no ASan run.
+- Open problems: dungeon music groups not heard in the browser (same
+  code path, only the group switch is new); ~45 MB music goes to the
+  server (only the played track downloads); wilderness plays town music
+  (upstream has field tracks, not copied).
+
+### Next: stage 7 (publish)
+- README: upstream hengband/hengband `master` @ `bf1054199`
+  (3.0.2.4-Beta, 2026-08-02); lineage Angband → Zangband → Hengband
+  (Mr.Hoge, ~2001; repo history starts 2002-01-12 with 1.0.8); web port:
+  `src/main-web.cpp`, Adam Bolt 16x16 tiles (user's choice), explore `X`,
+  `<`/`>` stair walking, Enter menu, item menus, 8 windows; controls;
+  credits as the Docs entry; licence note (jlicense.txt: state changes =
+  the README + compare link). `lib/xtra` is a submodule
+  (`hengband/hengband.xtra`): the memmaker repo keeps the pointer; build
+  needs `git submodule update --init lib/xtra`.
+- Index: card + tree entry in `~/Games/roguelikes-index`; the Hengband
+  node exists as parent of Chengband/PosChengband: make it a link with
+  author/year, image 384x160 from the Adam Bolt sheet (`web/tiles.webp`);
+  Zangband `3ec7ae8` / FrogComposband `e479d7e` commits as pattern; og
+  block by hand in `web/index.html`; `deploy.sh` after the orchestrator
+  creates the repo; W2 row in RVIP.md.
