@@ -4,8 +4,9 @@ Play: https://ruzzoli.de/roguelikes/hengband/
 Our changes: https://github.com/memmaker/hengband/compare/bf1054199...master
 
 Lineage: Moria → Angband (1990) → Zangband (Topi Ylinen, 1994) → Hengband
-(Mr.Hoge and many others, from the Japanese Zangband 2.2.8; 1.0.7 in
-December 2001, this repository's history starts 2002-01-12 with 1.0.8). The
+(Mr.Hoge and many others, from the Japanese Zangband 2.2.8; first public
+version 0.1.0 on 2000-06-19, stable 1.0.7 in November 2001, this repository's
+history starts 2002-01-12 with 1.0.8). The
 English build is upstream's own translation (built without `-DJP`).
 
 What this port adds (the game code in `src/` is changed only where noted):

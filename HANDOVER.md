@@ -580,3 +580,40 @@
   `SpellDefinitions`), `ClassSkillDefinitions.txt`, `lib/edit/quests`.
 - Links to add: card Info button, tree ✦, `#bar h1` link in
   `web/index.html`.
+
+### Stage 8 — shrine (done) 2026-09-26
+- **Shrine**: https://ruzzoli.de/roguelikes/shrine/hengband.html (index
+  `a8c4cee` "Add Hengband shrine", deployed with `deploy.sh`). Files in
+  `shrine/hengband/`: `manual.html` (all 35 English `lib/help/*.txt` +
+  `*.hlp`, BFS order from `help.hlp`; `[[[[c|…|` colour tags → spans,
+  `***** <Tag>` → anchors `file-Tag`, lettered links `[x]`/`(x)` → in-page
+  links; upstream dangling tags fall back to the file top, dangling files
+  left as text: `object.txt`, `charattr.txt`, `../pref/pickpref.prf`;
+  converter `web/mkmanual.py`), `changelog.txt` (123 GitHub release notes
+  2021-02-09 … 2026-08-02, mostly Japanese, + `version.txt`),
+  `license.txt` (English summary + `jlicense.txt` unchanged).
+- Links live: card Info button, tree ✦, `#bar h1` → shrine (already in
+  `web/index.html` since stage 5; no game redeploy). og block by hand
+  (image `roguelikes/hengband.png`). 375 px: no sideways scroll (page,
+  manual, index).
+- **Lineage settled**: founder = Mr.Hoge (news.txt; `faq.txt` "Mr.Hoge
+  wrote the first original part of Hengband"; `jlicense.txt` names Mr.hoge
+  copyright holder of all Hengband changes). RogueBasin's "iks" = team
+  member (commits from March 2002, 712 in git). Birth = 2000: work from
+  late March 2000, 0.1.0 first public 2000-06-19 (hengband.github.io
+  history/history0.1.0.html; ja.wikipedia says 2000-06-17); 1.0.0
+  2001-02-25; RogueBasin's "1.0.7, Dec 4 2001" vs official 2001-11-25.
+  Card tag and tree year changed 2001 → 2000; readme lineage line updated.
+- Missing: no walkthrough exists (page gives rules of thumb + Newbie
+  Guide, FAQ, RogueBasin, official site, score server dumps, Discussions).
+  Changelog gap 1.6 (2004) → v2.2.1r2 (2021): only on the official
+  history pages (Japanese) and git log; not copied.
+- Cheats: `allow_debug_opts`, `^W` wizard (death asks "Die?"), `^A` debug
+  (stage 5 used `^A k`), cheat_* options, Export/Import save. Not re-tested
+  in this stage.
+
+### Next: stage 9 (graveyard + leaderboard)
+- Death path: `src/core/game-play.cpp` (the "Die?" prompt ~l.342) and
+  `js_quit(msg, p_ptr->is_dead)` in `src/main-web.cpp`; score code in
+  `src/io/` / `core/`; worked example FrogComposband stage 9
+  (`files.c close_game()`).
