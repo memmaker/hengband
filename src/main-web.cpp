@@ -19,6 +19,8 @@
 #include "game-option/special-options.h"
 #include "io/input-key-acceptor.h"
 #include "main/sound-definitions-table.h"
+#include "player/player-status.h"
+#include "system/inner-game-data.h"
 #include "system/angband.h"
 #include "system/floor/floor-info.h"
 #include "system/player-type-definition.h"
@@ -73,6 +75,47 @@ EM_JS(int, js_next_event, (int at_cmd), { return Module.qb.nextEvent(at_cmd); })
 EM_JS(void, js_quit, (const char *msg, int dead), { Module.qb.quit(msg ? UTF8ToString(msg) : "", dead); });
 EM_JS(void, js_plog, (const char *msg), { Module.qb.plog(UTF8ToString(msg)); });
 EM_JS(void, js_sync, (void), { Module.qb.sync(); });
+
+/* Graveyard + leaderboard beacon (roguelikes-index/server/CONTRACT.md) */
+EM_JS(void, js_beacon, (const char *ev, const char *name, const char *killer, int depth, int score, int turns, int lvl), {
+    try {
+        var p = [['g', 'hengband'], ['ev', UTF8ToString(ev)], ['name', UTF8ToString(name)], ['killer', UTF8ToString(killer)],
+                 ['depth', depth], ['score', score], ['turns', turns], ['lvl', lvl]];
+        var q = p.filter(function (a) { return a[1] !== ''; })
+                 .map(function (a) { return a[0] + '=' + encodeURIComponent(a[1]); }).join('&');
+        if (window.RvipWM && RvipWM.report) RvipWM.report(q); else fetch('/roguelikes/beacon?' + q, { keepalive: true, mode: 'no-cors' }).catch(function () {});
+    } catch (e) {}
+});
+
+/*
+ * Called from close_game() (core/game-closer.cpp) once the run is over,
+ * before kingly()/tombstone. Suicide (Q) and signals die too ("Quitting",
+ * "Interrupting", "Abortion"); a winner's retire/seppuku keeps total_winner.
+ */
+void web_run_end(PlayerType *player_ptr)
+{
+    const auto &world = AngbandWorld::get_instance();
+    std::string k = player_ptr->died_from;
+    const char *ev = "death";
+    if (world.total_winner) {
+        ev = "win", k.clear();
+    } else if (k == "Quitting" || k == "Interrupting" || k == "Abortion") {
+        ev = "quit", k.clear();
+    }
+    /* player-damage.cpp take_hit(): "{hallucinatingly distorted }{a monster}{ while paralyzed}" */
+    for (std::string_view x : { " while paralyzed", " while being the statue" }) {
+        if (k.ends_with(x)) {
+            k.erase(k.size() - x.size());
+        }
+    }
+    for (std::string_view x : { "hallucinatingly distorted ", "a ", "an ", "the ", "The " }) {
+        if (k.starts_with(x)) {
+            k.erase(0, x.size());
+        }
+    }
+    js_beacon(ev, player_ptr->name, k.data(), player_ptr->current_floor_ptr->dun_level, (int)calc_score(player_ptr),
+        InnerGameData::get_instance().get_real_turns(world.game_turn), player_ptr->lev);
+}
 
 /* Persist the save directories (called after every save) */
 void web_sync_files()

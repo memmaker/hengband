@@ -162,6 +162,11 @@ void close_game(PlayerType *player_ptr)
         return;
     }
 
+#ifdef USE_WEB
+    extern void web_run_end(PlayerType *);
+    web_run_end(player_ptr);
+#endif
+
     TermCenteredOffsetSetter tcos(MAIN_TERM_MIN_COLS, MAIN_TERM_MIN_ROWS);
     if (world.total_winner) {
         kingly(player_ptr);
