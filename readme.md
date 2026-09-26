@@ -1,3 +1,61 @@
+**RVIP port** (browser version) of Hengband 3.0.2.4-Beta (2026-08-02), upstream
+[hengband/hengband branch `master` @ `bf1054199`](https://github.com/hengband/hengband/tree/bf1054199).
+Play: https://ruzzoli.de/roguelikes/hengband/
+Our changes: https://github.com/memmaker/hengband/compare/bf1054199...master
+
+Lineage: Moria → Angband (1990) → Zangband (Topi Ylinen, 1994) → Hengband
+(Mr.Hoge and many others, from the Japanese Zangband 2.2.8; 1.0.7 in
+December 2001, this repository's history starts 2002-01-12 with 1.0.8). The
+English build is upstream's own translation (built without `-DJP`).
+
+What this port adds (the game code in `src/` is changed only where noted):
+- **Web frontend** `src/main-web.cpp` (the 3.x C++ z-term) and `web/`
+  (`hengband.js`, shared `rvip-wm.js`): Emscripten with Asyncify and
+  exceptions, saves in the browser's IndexedDB.
+- **Windows**: the map plus Inventory, Messages, Visible, Recall, Equipment,
+  Objects and Character; drag bars to resize, titles to move, Windows ▾ to
+  switch them; the layout is kept across reloads.
+- **Tiles**: Adam Bolt's 16×16 set (upstream `graf-new.prf`, the sheet from
+  FrogComposband's `lib/xtra/graf`, `web/tiles.webp`), stand-ins for the gaps
+  in `lib/pref/graf-ab.prf` (`web/mkgraf-ab.py`), drawn nearest-neighbour.
+- **Explore** `X` (`src/cmd-action/cmd-explore.cpp`): walks to the nearest
+  unexplored spot, stops for monsters and messages. **`<` / `>`** take the
+  stairs you stand on or walk to the nearest known ones (upstream travel).
+- **Enter menu**: every command, grouped as the help's command list, with
+  the key of the current keyset (`src/io/input-key-requester.cpp`).
+- **Item menus**: `i` / `e` show a cursor list; Enter opens the actions for
+  the item, letter = main action, Shift = drop, Ctrl = examine
+  (`src/cmd-item/cmd-item.cpp`); every item prompt has a cursor.
+- **Sound and music** (off by default): Hengband's own CC0 effects and
+  CC0 / CC BY music from `lib/xtra` (`web/sounds.py`).
+- No `-more-` prompts in the browser; no score-server connection
+  (`-DDISABLE_NET`); fixes for upstream bugs found with AddressSanitizer
+  (the `port:` commits).
+
+Controls: the original keyset (or the roguelike one, `=` options); Enter for
+the command menu, `X` explore, `<`/`>` stairs, `?` help. The Help button
+opens the game guide.
+
+Build: `git submodule update --init lib/xtra` (sound, music:
+[hengband/hengband.xtra](https://github.com/hengband/hengband.xtra)), then
+`sh web/build.sh` → `web/dist` (needs emcc, python3).
+Deploy: `sh web/deploy.sh`. Notes: `HANDOVER.md`.
+
+Credits: Hengband by Mr.Hoge and many others, today maintained by the
+Hengband team (Hourier, Habu, Deskull, Eric Branlund, dis-, iks and
+contributors; https://hengband.github.io/); Zangband by Topi Ylinen, Robert
+Ruehlmann and the ZAngband DevTeam, Japanese version by Mitsuhiro Itakura;
+Angband by Ben Harrison and others, from Moria/Umoria (Robert Alan Koeneke,
+James E. Wilson); see `lib/file/news.txt`. Tiles by Adam Bolt. Sound and
+music: see `lib/xtra/sound/readme.txt` and `lib/xtra/music/readme.txt`.
+
+Licence: `lib/help/jlicense.txt` (the Moria/Angband licence plus Hengband's
+terms for changed versions: keep the notices, say what was changed, send no
+scores to the Hengband score server). What we changed is this list and the
+compare link above; this build has no network code.
+
+---
+
 # 変愚蛮怒 (Hengband)
 
 [![Release](https://github.com/hengband/hengband/actions/workflows/create-release.yml/badge.svg)](https://github.com/hengband/hengband/actions/workflows/create-release.yml)
