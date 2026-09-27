@@ -71,9 +71,12 @@
 
 	function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-	function measure(fontPx) {
+	/* Font family of a term: the map (term 0) has its own choice (L.mapFace) */
+	function face(i) { var n = L && (i ? L.face : L.mapFace); return n ? '"' + n + '", ' + FONT : FONT; }
+
+	function measure(fontPx, i) {
 		var c = document.createElement('canvas').getContext('2d');
-		c.font = fontPx + 'px ' + FONT;
+		c.font = fontPx + 'px ' + face(i);
 		return c.measureText('M').width;
 	}
 
@@ -116,6 +119,8 @@
 				});
 				if (s.audio) d.audio = { sound: s.audio.sound === true, music: s.audio.music === true };
 				if (s.wm) d.wm = s.wm;
+				if (typeof s.face === 'string') d.face = s.face;
+				if (typeof s.mapFace === 'string') d.mapFace = s.mapFace;
 				if (s.titles) Object.keys(s.titles).forEach(function (k) {
 					if (typeof s.titles[k] === 'string' && d.font[k]) d.titles[k] = s.titles[k].slice(0, 60);
 				});
@@ -123,6 +128,8 @@
 		} catch (err) { /* no layout saved yet */ }
 		L = d;
 		renderTiles();
+		$('sel-font').value = L.face || '';   /* if fonts.json came first */
+		loadFace(L.face); loadFace(L.mapFace);
 		if (L.audio) { audio.sound = !!L.audio.sound; audio.music = !!L.audio.music; renderAudio(); }
 	}
 
@@ -168,17 +175,18 @@
 			wins: [{ id: 'main', title: 'Map' }, { id: 'inv', title: 'Inventory' }, { id: 'msg', title: 'Messages' }, { id: 'mon', title: 'Visible' }, { id: 'rec', title: 'Recall' }, { id: 'eqp', title: 'Equipment' }, { id: 'obj', title: 'Objects' }, { id: 'chr', title: 'Character' }],
 			multi: { d: 'v', r: s.bottom, a: { d: 'h', r: s.side, a: 'main', b: { d: 'v', r: s.inv, a: 'inv', b: 'mon' } }, b: 'msg' },
 			single: 'main',
-			state: L.wm, noFont: 'main',
+			state: L.wm,
 			save: function (st) { L.wm = st; saveLayout(); },
 			layout: function (r) {
 				rects = r;
 				TERMS.forEach(function (d, i) { if (terms[i]) fitCanvas(i); });
 				scheduleSoon();
 			},
-			font: function (id, d) { zoomSub(id, d); },
+			font: function (id, d) { if (id === 'main') zoomMain(d); else zoomSub(id, d); },   /* Map: tile size */
 			onReset: resetLayout
 		});
 		wm.apply();
+		renderMapSel();
 	}
 
 	/* Canvas area of a window (inside its border and title bar) */
@@ -197,11 +205,11 @@
 			rows = clamp(Math.floor(box.h / ch), 24, 255);
 		} else {
 			font = L.font[TERMS[i].id];
-			cw = Math.ceil(measure(font)); ch = Math.round(font * 1.3);
+			cw = Math.ceil(measure(font, i)); ch = Math.round(font * 1.3);
 			cols = clamp(Math.floor(box.w / cw), 1, 255);
 			rows = clamp(Math.floor(box.h / ch), 1, 255);
 		}
-		return { cols: cols, rows: rows, cw: cw, ch: ch, font: font };
+		return { cols: cols, rows: rows, cw: cw, ch: ch, font: font, face: face(i) };
 	}
 
 	/*
@@ -215,7 +223,7 @@
 		T.cv.style.width = (w * sc) + 'px';
 		T.cv.style.height = (h * sc) + 'px';
 		/* the prompt line box covers exactly row 0 (never the list below it) */
-		if (!i) { var m = $('t-main').style; m.setProperty('--row-h', (T.ch * sc) + 'px'); m.setProperty('--row-font', (T.font * sc) + 'px'); }
+		if (!i) { var m = $('t-main').style; m.setProperty('--row-h', (T.ch * sc) + 'px'); m.setProperty('--row-font', (T.font * sc) + 'px'); m.setProperty('--row-face', face(0)); }
 	}
 
 	/* (Re)size one term's canvas; resizing the canvas also blanks it */
@@ -228,11 +236,11 @@
 		ctx.imageSmoothingEnabled = false;
 		ctx.textBaseline = 'middle';
 		ctx.textAlign = 'center';
-		ctx.font = l.font + 'px ' + FONT;
+		ctx.font = l.font + 'px ' + l.face;
 		ctx.fillStyle = '#000';
 		ctx.fillRect(0, 0, cols * l.cw, rows * l.ch);
 		terms[i] = { cv: cv, ctx: ctx, cols: cols, rows: rows,
-			cw: l.cw, ch: l.ch, font: l.font, dpr: dpr };
+			cw: l.cw, ch: l.ch, font: l.font, face: l.face, dpr: dpr };
 		fitCanvas(i);
 	}
 
@@ -253,7 +261,7 @@
 
 	function sameShape(T, l) {
 		return T.cols === l.cols && T.rows === l.rows && T.cw === l.cw &&
-			T.ch === l.ch && T.font === l.font;
+			T.ch === l.ch && T.font === l.font && T.face === l.face;
 	}
 
 	function scheduleLayout() {
@@ -300,7 +308,7 @@
 	}
 
 	function resetLayout() {
-		L = Object.assign(defaultLayout(), { audio: L.audio, wm: wm.state() });
+		L = Object.assign(defaultLayout(), { audio: L.audio, face: L.face, mapFace: L.mapFace, text: L.text, wm: wm.state() });
 		scheduleLayout();
 		saveLayout();
 	}
@@ -407,11 +415,31 @@
 		saveLayout();
 		renderTiles();
 	}
-	function renderTiles() { $('btn-tiles').textContent = 'Tiles: ' + (L && L.text ? 'off' : 'on'); }
+	function renderTiles() { $('btn-tiles').textContent = 'Tiles: ' + (tilesReady && !(L && L.text) ? 'Adam Bolt' : 'None'); renderMapSel(); }
+
+	/* Map font chooser: on the Map title bar (shown on hover), text mode only */
+	var mapSel = document.createElement('select');
+	mapSel.title = 'Map font (text mode)';
+	mapSel.innerHTML = '<option value="">Default font</option>';
+	mapSel.addEventListener('pointerdown', function (e) { e.stopPropagation(); });   /* not a window drag */
+	function renderMapSel() {
+		var bs = document.querySelector('#t-main .wm-btns');
+		if (bs && mapSel.parentNode !== bs) bs.insertBefore(mapSel, bs.firstChild);
+		mapSel.hidden = !(L && L.text);
+		mapSel.value = (L && L.mapFace) || '';
+	}
+
+	/* Text font: a face from the index page's fonts/ (web/build.sh lists them in fonts.json);
+	   the terms get new cell sizes and the game redraws them (qb.applyLayout) */
+	function loadFace(n, now) {
+		if (!n) { if (now) scheduleLayout(); return; }
+		var ff = new FontFace(n, 'url(../fonts/' + n + '.woff)');
+		ff.load().then(function () { document.fonts.add(ff); terms.forEach(function (T) { if (T) T.face = ''; }); scheduleLayout(); }).catch(function () { status('Could not load the font ' + n + '.', true); });
+	}
 
 	function renderAudio() {
-		$('btn-sound').textContent = 'Sound: ' + (audio.sound ? 'on' : 'off');
-		$('btn-music').textContent = 'Music: ' + (audio.music ? 'on' : 'off');
+		$('chk-sound').checked = audio.sound;
+		$('chk-music').checked = audio.music;
 	}
 
 	var qb = {
@@ -817,6 +845,7 @@
 		tilesReady = ok;
 		tilesDone = true;
 		if (!ok) status('Could not load the tile set; using text.', true);
+		if (L) renderTiles();
 		if (tilesWait) Module.removeRunDependency('tiles');
 	}
 	tiles.onload = function () { tilesFinished(true); };
@@ -833,11 +862,20 @@
 		$('btn-new').onclick = newGame;
 		$('btn-help').onclick = toggleHelp;
 		$('help-close').onclick = toggleHelp;
-		$('btn-zoom-in').onclick = function () { zoomMain(1); };
-		$('btn-zoom-out').onclick = function () { zoomMain(-1); };
 		$('btn-tiles').onclick = toggleTiles;
-		$('btn-sound').onclick = function () { toggleAudio('sound'); };
-		$('btn-music').onclick = function () { toggleAudio('music'); };
+		$('chk-sound').onchange = function () { toggleAudio('sound'); };
+		$('chk-music').onchange = function () { toggleAudio('music'); };
+		RvipWM.dropdown($('btn-audio'), $('menu-audio'));
+		RvipWM.dropdown($('btn-file'), $('menu-file'));
+		fetch('fonts.json').then(function (r) { return r.json(); }).then(function (list) {
+			[[$('sel-font'), 'face'], [mapSel, 'mapFace']].forEach(function (a) {
+				list.forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n.replace(/^Web(Plus|437)_/, '').replace(/_/g, ' '); a[0].appendChild(o); });
+				a[0].value = (L && L[a[1]]) || '';
+			});
+		}).catch(function () { });
+		[[$('sel-font'), 'face'], [mapSel, 'mapFace']].forEach(function (a) {
+			a[0].onchange = function () { if (!L) return; L[a[1]] = this.value; saveLayout(); loadFace(this.value, true); this.blur(); };
+		});
 		renderAudio();
 
 		/* Buttons never take the keyboard focus away from the game */

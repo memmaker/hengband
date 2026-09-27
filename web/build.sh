@@ -44,6 +44,9 @@ em++ -O2 -fexceptions $OBJ/*.o -o "$OUT/hengband-core.js" \
 	--preload-file web/stage/lib@/hengband/lib
 
 cp web/index.html web/hengband.js web/tiles.webp "$OUT/"
+# Text fonts: the index page's fonts/ (served at ../fonts/ next to the games)
+FONTS=${FONTS:-$HOME/Games/roguelikes-index/fonts}
+(ls "$FONTS"/*.woff 2>/dev/null | sed 's|.*/||; s/\.woff$//') | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))' > "$OUT/fonts.json"
 # Help: the game guide from the Docs (~/Desktop/Games/Roguelikes/Docs)
 python3 web/make-help.py > "$OUT/help.html"
 rm -rf web/stage
