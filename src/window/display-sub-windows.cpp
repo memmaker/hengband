@@ -417,6 +417,9 @@ void fix_message(void)
             }
 
             auto displayed_lines = 0;
+#ifdef USE_WEB
+            std::vector<std::pair<TERM_COLOR, std::string>> shown;
+#endif
             for (auto i = 0; i < message_num() && displayed_lines < hgt; ++i) {
                 const auto color = (i < now_message) ? TERM_WHITE : TERM_SLATE;
 
@@ -430,10 +433,21 @@ void fix_message(void)
                         break;
                     }
 
+#ifdef USE_WEB
+                    shown.emplace_back(color, line);
+#else
                     term_putstr(0, y, -1, color, line);
+#endif
                     displayed_lines++;
                 }
             }
+#ifdef USE_WEB
+            /* RVIP: the history fills from the top (no empty band above the first message) */
+            for (auto y = 0; y < displayed_lines; ++y) {
+                const auto &[c, l] = shown[displayed_lines - 1 - y];
+                term_putstr(0, y, -1, c, l);
+            }
+#endif
         });
 }
 
