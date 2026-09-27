@@ -16,6 +16,7 @@
 #include "action/travel-execution.h"
 #include "action/tunnel-execution.h"
 #include "cmd-action/cmd-move.h"
+#include "core/stuff-handler.h"
 #include "floor/geometry.h"
 #include "game-option/input-options.h"
 #include "locale/language-switcher.h"
@@ -30,6 +31,7 @@
 #include "system/monster-entity.h"
 #include "system/player-type-definition.h"
 #include "system/terrain/terrain-definition.h"
+#include "term/z-term.h"
 #include "timed-effect/timed-effects.h"
 #include "view/display-messages.h"
 #include "world/world.h"
@@ -253,6 +255,14 @@ void explore_new_level()
 /* One explore step ('X', then each turn while auto_explore is set) */
 void explore_step(PlayerType *player_ptr)
 {
+#ifdef USE_WEB
+    /* RVIP: auto-explore moves visibly: paint the last step, then wait 40 ms */
+    if (auto_explore) {
+        handle_stuff(player_ptr);
+        term_fresh();
+        term_xtra(TERM_XTRA_DELAY, 40);
+    }
+#endif
     auto &floor = *player_ptr->current_floor_ptr;
     const auto p_pos = player_ptr->get_position();
     auto_explore = false;
