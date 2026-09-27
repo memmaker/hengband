@@ -31,6 +31,7 @@
 #include "term/z-util.h"
 #include "util/enum-converter.h"
 #include "util/int-char-converter.h"
+#include "window/main-window-util.h"
 #include "world/world.h"
 #include <emscripten.h>
 #include <string_view>
@@ -322,15 +323,31 @@ static errr term_xtra_web(int n, int v)
     return 1;
 }
 
+/* RVIP: no cursor box on the hero's own map cell (the hero is marked already) */
+static bool web_cursor_on_hero(TERM_LEN x, TERM_LEN y)
+{
+    if ((web_idx() != 0) || !AngbandWorld::get_instance().character_generated || !p_ptr || !p_ptr->current_floor_ptr) {
+        return false;
+    }
+    if (AngbandWorld::get_instance().character_icky_depth > 0) {
+        return false;
+    }
+    return (y == p_ptr->y - panel_row_prt) && (x == panel_col_of(p_ptr->x));
+}
+
 static errr term_curs_web(TERM_LEN x, TERM_LEN y)
 {
-    js_curs(web_idx(), x, y, 1);
+    if (!web_cursor_on_hero(x, y)) {
+        js_curs(web_idx(), x, y, 1);
+    }
     return 0;
 }
 
 static errr term_bigcurs_web(TERM_LEN x, TERM_LEN y)
 {
-    js_curs(web_idx(), x, y, 2);
+    if (!web_cursor_on_hero(x, y)) {
+        js_curs(web_idx(), x, y, 2);
+    }
     return 0;
 }
 
