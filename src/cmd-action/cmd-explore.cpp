@@ -346,19 +346,9 @@ void explore_to_stairs(PlayerType *player_ptr, bool up)
     explore_stairs = up ? 1 : -1;
 }
 
-/* Travel to stairs ended: take them if we are on them */
+/* Travel to stairs ended: only walk there (RVIP: the player presses '<' / '>' again to take them) */
 void explore_stairs_arrive(PlayerType *player_ptr)
 {
-    const auto stairs = explore_stairs;
+    (void)player_ptr;
     explore_stairs = 0;
-    const auto &flags = player_ptr->current_floor_ptr->get_grid(player_ptr->get_position()).get_terrain().flags;
-    if (flags.has_not((stairs > 0) ? TerrainCharacteristics::UP_STAIRS : TerrainCharacteristics::DOWN_STAIRS)) {
-        return;
-    }
-
-    if (stairs > 0) {
-        do_cmd_go_up(player_ptr);
-    } else {
-        do_cmd_go_down(player_ptr);
-    }
 }
