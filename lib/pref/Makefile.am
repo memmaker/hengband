@@ -5,7 +5,7 @@ angband_files = \
 	colors.prf \
 	font-mac.prf font-mon.prf font-win.prf font-x11.prf \
 	font-xxx.prf font.prf \
-	graf-ab.prf graf-gcu.prf graf-mac.prf graf-new.prf graf-ne2.prf \
+	graf-ab.prf graf-gcu.prf graf-8x8.prf graf-shb.prf graf-mac.prf graf-new.prf graf-ne2.prf \
 	graf-win.prf graf-x11.prf graf-xxx.prf \
 	graf.prf \
 	pref-gcu.prf pref-key.prf pref-mac.prf pref-opt.prf \

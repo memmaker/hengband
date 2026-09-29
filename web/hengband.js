@@ -5,7 +5,13 @@
 (function () {
 	'use strict';
 
-	var TILE = 16;                 /* source tile size in tiles.webp (Adam Bolt 16x16) */
+	/* Tile sets (one set per choice, never mixed); index = the game's set number (main-web.cpp web_graphics) */
+	var SETS = [
+		{ id: 'none', name: 'None' },
+		{ id: 'ab', name: 'Adam Bolt', src: 'tiles.webp', tile: 16 },        /* FrogComposband 16x16.bmp + graf-ab stand-ins */
+		{ id: '8x8', name: 'Hengband 8x8', src: 'tiles-8x8.webp', tile: 8 },  /* Hengband's own lib/xtra/graf/8x8.bmp + graf-8x8 */
+		{ id: 'shb', name: 'Shockbolt', src: 'tiles-shb.webp', tile: 64 }    /* Angband 4.2 Shockbolt + graf-shb */
+	];
 		var PERSIST = ['/hengband/lib/save', '/hengband/lib/user', '/hengband/lib/apex', '/hengband/lib/bone'];
 
 	/* Term 0 main; what terms 1-7 show: web_window_flags[] in src/main-web.cpp */
@@ -23,8 +29,8 @@
 	var palette = [];
 	var terms = [];
 	var events = [];
-	var tiles = new Image();
-	var tilesReady = false;
+	var tileSet = 0;               /* chosen set with its sheet loaded (SETS index) */
+	var drawSet = 0;               /* set the game draws now (it switches at a command prompt) */
 	var dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
 
 	function $(id) { return document.getElementById(id); }
@@ -103,6 +109,7 @@
 
 	function loadLayout() {
 		var d = defaultLayout();
+		d.tiles = 'ab';
 		try {
 			var s = JSON.parse(Module.FS.readFile(LAYOUT_FILE, { encoding: 'utf8' }));
 			if (s && s.v === 1) {
@@ -112,7 +119,7 @@
 				if (TILE_STEPS.indexOf(s.tile) >= 0) d.tile = s.tile;
 				d.autoSplit = s.autoSplit === true;
 				d.autoTile = s.autoTile === true;
-				d.text = s.text === true;
+				d.tiles = typeof s.tiles === 'string' ? s.tiles : s.text === true ? 'none' : 'ab';   /* old layouts: text on/off */
 				if (d.autoSplit || d.autoTile) followWindow(d);
 				if (s.audio) d.audio = { sound: s.audio.sound === true, music: s.audio.music === true };
 				if (s.wm) d.wm = s.wm;
@@ -204,7 +211,7 @@
 			ch = L.tile; cw = L.tile / 2;
 			font = Math.floor(Math.min(ch * 0.8, cw / 0.62));
 			/* text mode: the cell is as wide as the map font's glyphs (no overlap, no gaps) */
-			if (L.text || !tilesReady) cw = Math.ceil(measure(font, 0));
+			if (!tileSet) cw = Math.ceil(measure(font, 0));
 			cols = clamp(Math.floor(box.w / cw), 80, 255);
 			rows = clamp(Math.floor(box.h / ch), 24, 255);
 		} else {
@@ -303,7 +310,7 @@
 	var zoomMsgTimer = 0;
 
 	function resetLayout() {
-		L = Object.assign(defaultLayout(), { audio: L.audio, face: L.face, mapFace: L.mapFace, text: L.text, wm: wm.state() });
+		L = Object.assign(defaultLayout(), { audio: L.audio, face: L.face, mapFace: L.mapFace, tiles: L.tiles, wm: wm.state() });
 		scheduleLayout();
 		saveLayout();
 	}
@@ -364,12 +371,9 @@
 		return String.fromCharCode(b);
 	}
 
-	/* Sound effects (lib/xtra/sound/sound.cfg) and Hengband's own music
-	   (lib/xtra/music, music.cfg town / dun_low / dun_med / dun_high), both off by default */
-	var audio = { sound: false, music: false, cfg: null, cache: {}, depth: -1, group: '',
-		song: new Audio() };
-	audio.song.loop = true;
-	function musicGroup(d) { return d < 0 ? '' : d === 0 ? 'town' : d >= 80 ? 'dun_high' : d >= 40 ? 'dun_med' : 'dun_low'; }
+	/* Sound effects (lib/xtra/sound/sound.cfg) and Hengband's own music (lib/xtra/music:
+	   the game's scene table picks the file from music.cfg, qb.music), both off by default */
+	var audio = { sound: false, music: false, cfg: null, cache: {}, file: '', song: null };
 
 	/* Read lazily from the preloaded FS (a fetch of .cfg is served as a download) */
 	function loadSoundCfg() {
@@ -384,12 +388,9 @@
 
 	/* Same group (e.g. town -> town) keeps the song playing; a new group picks one of its 5 tracks */
 	function updateMusic() {
-		var g = musicGroup(audio.depth);
-		if (!audio.music || !g) { audio.song.pause(); return; }
-		if (g !== audio.group) {
-			audio.group = g;
-			audio.song.src = 'music/' + (g === 'town' ? 'town' : g) + (1 + Math.floor(Math.random() * 5)) + '.mp3';
-		}
+		if (!audio.music || !audio.file) { if (audio.song) audio.song.pause(); return; }
+		if (!audio.song) { audio.song = new Audio(); audio.song.loop = true; }   /* lazily: no mp3 fetch with music off */
+		if (audio.song.dataset.file !== audio.file) { audio.song.dataset.file = audio.file; audio.song.src = 'music/' + audio.file; }
 		audio.song.play().catch(function () { });
 	}
 
@@ -401,17 +402,36 @@
 		updateMusic();
 	}
 
-	/* Tiles <-> text, applied by the game at its next command prompt */
+	/* Tile set: the button cycles None -> Adam Bolt -> Hengband 8x8 -> Shockbolt; the sheet
+	   loads on first use and the game switches at its next command prompt */
 	var tilesSwitch = -1;
+	function setIndex(id) { for (var i = 0; i < SETS.length; i++) if (SETS[i].id === id) return i; return 1; }
+	function loadSheet(i, done) {
+		var S = SETS[i];
+		if (!S.src || S.ok) return done(true);
+		(S.wait = S.wait || []).push(done);
+		if (S.img) return;
+		S.img = new Image();
+		S.img.onload = S.img.onerror = function (e) {
+			S.ok = e.type === 'load';
+			if (!S.ok) { S.img = null; status('Could not load the ' + S.name + ' tiles; using text.', true); }
+			S.wait.splice(0).forEach(function (f) { f(S.ok); });
+		};
+		S.img.src = S.src;   /* drawn nearest-neighbour at cell size */
+	}
 	function toggleTiles() {
-		if (!tilesReady) return;
-		L.text = !L.text;
-		scheduleLayout();   /* text mode sizes map cells from the font */
-		tilesSwitch = L.text ? 0 : 1;
+		var want = (setIndex(L.tiles) + 1) % SETS.length;
+		L.tiles = SETS[want].id;
 		saveLayout();
 		renderTiles();
+		loadSheet(want, function (ok) {
+			if (SETS[setIndex(L.tiles)] !== SETS[want]) return;   /* clicked on meanwhile */
+			tileSet = ok ? want : 0;
+			tilesSwitch = tileSet;
+			scheduleLayout();   /* text mode sizes map cells from the font */
+		});
 	}
-	function renderTiles() { $('btn-tiles').textContent = 'Tiles: ' + (tilesReady && !(L && L.text) ? 'Adam Bolt' : 'None'); renderMapSel(); }
+	function renderTiles() { $('btn-tiles').textContent = 'Tiles: ' + SETS[L ? setIndex(L.tiles) : tileSet].name; renderMapSel(); }
 
 	/* Map font chooser: on the Map title bar (shown on hover), text mode only */
 	var mapSel = document.createElement('select');
@@ -421,7 +441,7 @@
 	function renderMapSel() {
 		var bs = document.querySelector('#t-main .wm-btns');
 		if (bs && mapSel.parentNode !== bs) bs.insertBefore(mapSel, bs.firstChild);
-		mapSel.hidden = !(L && L.text);
+		mapSel.hidden = !!tileSet;
 		mapSel.value = (L && L.mapFace) || '';
 	}
 
@@ -450,9 +470,8 @@
 			a.play().catch(function () { });
 		},
 
-		depth: function (d) {
-			if (d === audio.depth) return;
-			audio.depth = d;
+		music: function (f) {
+			audio.file = f;
 			updateMusic();
 		},
 
@@ -505,7 +524,8 @@
 		pict: function (t, x, y, n, ap, cp, tap, tcp, big) {
 			var T = terms[t], c = T.ctx, H = Module.HEAPU8;
 			var w = T.cw * (big ? 2 : 1), h = T.ch;
-			var sw = tiles.naturalWidth, sh = tiles.naturalHeight;
+			var S = SETS[drawSet], tiles = S.img, TILE = S.tile;
+			var sw = tiles ? tiles.naturalWidth : 0, sh = tiles ? tiles.naturalHeight : 0;
 			for (var i = 0; i < n; i++) {
 				var a = H[ap + i], k = H[cp + i];
 				var ta = H[tap + i], tk = H[tcp + i];
@@ -515,7 +535,7 @@
 				if ((a & 0xF0) === 0xF0 && k === 255) continue;
 
 				/* Not a tile: plain text in a graphics call */
-				if (!(a & 0x80) || !(k & 0x80) || !tilesReady) {
+				if (!(a & 0x80) || !(k & 0x80) || !tiles) {
 					c.fillStyle = '#000';
 					c.fillRect(px, py, T.cw, h);
 					if (k > 32) {
@@ -539,8 +559,8 @@
 		},
 
 		/* Tiles button: the game asks at start and at each command prompt */
-		tilesWanted: function () { return (tilesReady && !L.text) ? 1 : 0; },
-		tilesSwitch: function () { var s = tilesSwitch; tilesSwitch = -1; return s; },
+		tilesWanted: function () { drawSet = tileSet; return tileSet; },
+		tilesSwitch: function () { var s = tilesSwitch; tilesSwitch = -1; if (s >= 0) drawSet = s; return s; },
 
 		curs: function (t, x, y, w) {
 			var T = terms[t], c = T.ctx;
@@ -681,6 +701,11 @@
 				status('Could not read saved games from IndexedDB (' + err + '). ' +
 					'Saving may not work in this browser mode.', true);
 			}
+			/* The saved tile set's sheet loads now (no default-sheet flash); main() waits for it */
+			var want = 1;
+			try { var s = JSON.parse(FS.readFile(LAYOUT_FILE, { encoding: 'utf8' })); want = setIndex(s.tiles || (s.text === true ? 'none' : 'ab')); } catch (e) { }
+			Module.addRunDependency('tiles');
+			loadSheet(want, function (ok) { tileSet = ok ? want : 0; if (L) renderTiles(); Module.removeRunDependency('tiles'); });
 			Module.removeRunDependency('idbfs');
 		});
 	}
@@ -722,10 +747,6 @@
 		arguments: ['-u' + 'PLAYER'],
 		noInitialRun: false,
 		preRun: [function () {
-			if (!tilesDone) {
-				Module.addRunDependency('tiles');
-				tilesWait = true;
-			}
 			/* Empty dirs aren't packaged; the game builds lib/data/*.raw at startup */
 			['/hengband/lib/data', '/hengband/lib/info', '/hengband/lib/script'].forEach(function (d) { Module.FS.mkdirTree(d); });
 			/* Own paths: IndexedDB names come from the mount points, shared per origin */
@@ -747,18 +768,6 @@
 		onAbort: function (what) { app.crashed(what); }
 	};
 
-	/* Tile sheet; main() waits for it */
-	var tilesDone = false, tilesWait = false;
-	function tilesFinished(ok) {
-		tilesReady = ok;
-		tilesDone = true;
-		if (!ok) status('Could not load the tile set; using text.', true);
-		if (L) renderTiles();
-		if (tilesWait) Module.removeRunDependency('tiles');
-	}
-	tiles.onload = function () { tilesFinished(true); };
-	tiles.onerror = function () { tilesFinished(false); };
-	tiles.src = 'tiles.webp';   /* Adam Bolt 16x16, drawn nearest-neighbour at cell size */
 
 	document.addEventListener('keydown', onKey);
 	document.addEventListener('DOMContentLoaded', function () {

@@ -649,3 +649,60 @@
   deleted on both origins. Real Serpent kill not tested.
 
 ### Next: RVIP complete (stage 9 was the last)
+
+### Tile set choice + scene-table music (2026-09-29)
+- **Tiles button cycles 4 sets** (each stands alone, never mixed; same-set
+  stand-ins for the gaps): None → Adam Bolt → Hengband 8x8 → Shockbolt.
+  Kept by id in the layout file (`web-layout.json` `tiles`: none/ab/8x8/shb;
+  old `text: true` = none). The saved set's sheet loads in the IDBFS
+  `syncfs(true)` callback before `main()` (run dependency `tiles`), other
+  sheets on first use. C++ decides per cell: `main-web.cpp`
+  `web_graphics(set)` → `$GRAF` "ascii"/"new"/"old"/"shb" (pref chain in
+  `graf-x11.prf`); JS only blits (`SETS[drawSet]`: `tile` 16/8/64 px,
+  `drawSet` changes when the game takes the switch at a command prompt).
+- **Coverage** (`python3 web/tile-coverage.py ab|8x8|shb`, of 2247
+  monsters+base items+terrains; real / stand-ins):
+  Adam Bolt 2246 = 100.0%: real 1435 (63.9%), stand-ins 811 (graf-ab.prf);
+  Hengband 8x8 2247 = 100%: real 1627 (72.4%: monsters 928, items 599,
+  terrains 100), stand-ins 620 (`graf-8x8.prf`, `python3 web/mkgraf-ab.py
+  8x8`); Shockbolt 2246 = 100.0%: real 1183 (52.6%: monsters 464 by name,
+  items 531 by name/flavour/book, terrains 188 by hand), stand-ins 1063
+  (952 monsters, 111 items; `graf-shb.prf`, `python3 web/mkgraf-shb.py`,
+  port of Frog's by JSON id). The miss (id 196 UNDETECTED) is black on
+  purpose.
+- **Which original set** (only official upstream sources): the git
+  submodule's `lib/xtra/graf/8x8.bmp` (multilockon123's update, 512x792,
+  = the 3.0.2.4-Beta release zip) is Hengband's own set, most real tiles
+  (1627; 2 graf-xxx entries point at unused grey cells). The only other
+  official download is release asset `heng-graf-16x16.zip`
+  (3.0.1.29-Beta, linked from hengband.github.io/download.html: 2002
+  `16x16.bmp` 1024x1072 + mask): Adam Bolt's 32 columns (palette-shifted,
+  some tiles differ) + 32 columns of Hengband additions graf-new.prf
+  addresses → 1544 real tiles with graf-new.prf (Frog's 512-wide sheet:
+  1435; 357 graf-new entries point past column 31). No 32x32 sheet
+  (GRAPHICS_HENGBAND, `graf-ne2.prf`, `32X32.BMP` in main-win) was ever
+  released; the 8x8 in that zip is the older 256-wide version. Option not
+  taken: swap the Adam Bolt slot's sheet to the release 16x16 (+109 real).
+- 8x8 is opaque (no mask), grey (48,48,48) = unused cell (both scripts treat
+  a uniform grey cell as no tile). Shockbolt plants get a grass background
+  (`display-map.cpp` `map_info()`, `USE_WEB`, `$GRAF` shb). Sheets:
+  `web/tiles-8x8.webp` (51 kB), `web/tiles-shb.webp` (13 MB, Frog's).
+- **Music = the game's scene table**: `TERM_XTRA_SCENE` / `MUSIC_*` in
+  `term_xtra_web` → upstream `main-unix/unix-music.cpp` (`USE_WEB`: plays
+  via `Module.qb.music(file)` instead of spawning a player), lazy
+  `init_music()` at the first scene. `build.sh` preloads upstream
+  `music.cfg` + an empty file per shipped track (CfgReader keeps only
+  files that exist, so unshipped scenes fall through as natively) and
+  copies town1-5, field_low/med/high1-3, wild, dun_low/med/high1-5 (31
+  files incl. readme) to `dist/music`. Wilderness = `field1/2/3` by player
+  level (<25, <45, 45+), travel map = `wild`, towns = `townNNN` (Outpost
+  = town1), dungeon = dun_low/med/high by depth. `use_music` set with
+  `use_sound` (page Music button is the switch).
+- Tested (own tab, 127.0.0.1:8797, fresh origin): birth → town
+  `town1.mp3` 200 (Music on by real click) → walk east out of town →
+  `field_low1.mp3` 200 → `<` travel map → `wild.mp3` 200 → back → town →
+  Yeek cave L1 → `dun_low2.mp3` 200. Tiles cycled on the travel map
+  (8x8, Shockbolt), in the cave Shockbolt → None → Adam Bolt → … →
+  Shockbolt, Ctrl-S, reload: restored in the cave with Shockbolt, only
+  `tiles-shb.webp` fetched. No console errors. IDBFS `/hengband/lib/*`
+  deleted from a plain page.

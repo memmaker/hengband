@@ -17,7 +17,9 @@
 #include "game-option/option-flags.h"
 #include "game-option/runtime-arguments.h"
 #include "game-option/special-options.h"
+#include "io/files-util.h"
 #include "io/input-key-acceptor.h"
+#include "main-unix/unix-music.h"
 #include "main/sound-definitions-table.h"
 #include "player/player-status.h"
 #include "system/inner-game-data.h"
@@ -29,6 +31,7 @@
 #include "term/term-color-types.h"
 #include "term/z-term.h"
 #include "term/z-util.h"
+#include "util/angband-files.h"
 #include "util/enum-converter.h"
 #include "util/int-char-converter.h"
 #include "window/main-window-util.h"
@@ -40,6 +43,9 @@
 constexpr auto WEB_TERMS = 8; /* terms 1-7: see web_window_flags() */
 
 static term_type web_term[WEB_TERMS];
+
+static void web_init_music();
+static int web_tileset = 0; /* see web_graphics() */
 
 /* Pending "save now" request from the page (tab hidden / closing) */
 static bool web_want_save = false;
@@ -56,13 +62,12 @@ EM_JS(void, js_curs, (int t, int x, int y, int w), { Module.qb.curs(t, x, y, w);
 /* big = 1 in big-tile mode: the tile covers this cell and the next one */
 EM_JS(void, js_pict, (int t, int x, int y, int n, const TERM_COLOR *ap, const char *cp, const TERM_COLOR *tap, const char *tcp, int big),
     { Module.qb.pict(t, x, y, n, ap, cp, tap, tcp, big); });
-/* Tiles (1) or text (0) as the page's Tiles button says; switch: -1 = no change */
+/* Tile set as the page's Tiles button says (0 text, 1 Adam Bolt, 2 Hengband 8x8, 3 Shockbolt); switch: -1 = no change */
 EM_JS(int, js_tiles_wanted, (void), { return Module.qb.tilesWanted(); });
 EM_JS(int, js_tiles_switch, (void), { return Module.qb.tilesSwitch(); });
 EM_JS(void, js_fresh, (int t), { Module.qb.fresh(t); });
 EM_JS(void, js_bell, (void), { Module.qb.bell(); });
 EM_JS(void, js_sound, (const char *name), { Module.qb.sound(UTF8ToString(name)); });
-EM_JS(void, js_depth, (int depth), { Module.qb.depth(depth); });
 EM_JS(void, js_color, (int i, int r, int g, int b), { Module.qb.color(i, r, g, b); });
 EM_JS(int, js_term_cols, (int t), { return Module.qb.termCols(t); });
 EM_JS(int, js_term_rows, (int t), { return Module.qb.termRows(t); });
@@ -194,7 +199,7 @@ static void web_keypress(int k)
     }
 }
 
-static void web_switch_graphics(bool on);
+static void web_switch_graphics(int set);
 
 static bool web_pump()
 {
@@ -215,9 +220,9 @@ static bool web_pump()
 
     /* Tiles <-> text: only while waiting for a command */
     if (web_at_prompt() && !got) {
-        const auto on = js_tiles_switch();
-        if ((on >= 0) && ((on != 0) != use_graphics)) {
-            web_switch_graphics(on != 0);
+        const auto set = js_tiles_switch();
+        if ((set >= 0) && (set != web_tileset)) {
+            web_switch_graphics(set);
             got = true;
         }
     }
@@ -290,14 +295,26 @@ static errr term_xtra_web(int n, int v)
     case TERM_XTRA_FRESH: {
         js_fresh(web_idx());
 
-        /* The page's Sound button is the only switch (off by default) */
+        /* The page's Sound / Music buttons are the only switches (off by default) */
         use_sound = true;
-
-        /* The page plays town music at depth 0 */
-        const auto generated = AngbandWorld::get_instance().character_generated;
-        js_depth((generated && p_ptr->current_floor_ptr) ? p_ptr->current_floor_ptr->dun_level : -1);
+        use_music = true;
         return 0;
     }
+    /* Music: the game's own scene table and music.cfg (as main-x11.cpp) */
+    case TERM_XTRA_MUSIC_BASIC:
+    case TERM_XTRA_MUSIC_DUNGEON:
+    case TERM_XTRA_MUSIC_QUEST:
+    case TERM_XTRA_MUSIC_TOWN:
+    case TERM_XTRA_MUSIC_MONSTER:
+        web_init_music();
+        return unix_music::play_music(n, v) ? 0 : 1;
+    case TERM_XTRA_MUSIC_MUTE:
+        unix_music::stop_music();
+        return 0;
+    case TERM_XTRA_SCENE:
+        web_init_music();
+        unix_music::play_music_scene(v);
+        return 0;
     case TERM_XTRA_BORED:
         return web_check_events(0);
     case TERM_XTRA_EVENT:
@@ -372,20 +389,37 @@ static errr term_pict_web(TERM_LEN x, TERM_LEN y, int n, const TERM_COLOR *ap, c
     return 0;
 }
 
-/* Adam Bolt 16x16 tiles (graf-new.prf + graf-ab.prf) in big-tile mode, or text */
-static void web_graphics(bool on)
+/*
+ * Tile set in big-tile mode, or text.  Each set has its own $GRAF and prefs
+ * (graf-x11.prf): 1 Adam Bolt 16x16 "new" (graf-new + graf-ab), 2 Hengband's
+ * own 8x8 set "old" (graf-xxx + graf-8x8), 3 Shockbolt "shb" (graf-shb);
+ * 0 text.
+ */
+static void web_graphics(int set)
 {
-    use_graphics = on;
-    arg_graphics = on ? 2 : 0; /* GRAPHICS_ADAM_BOLT : GRAPHICS_NONE (main.cpp) */
-    ANGBAND_GRAF = on ? "new" : "ascii";
-    arg_bigtile = on;
+    static constexpr std::string_view grafs[] = { "ascii", "new", "old", "shb" };
+    web_tileset = (set > 0 && set < 4) ? set : 0;
+    use_graphics = web_tileset != 0;
+    arg_graphics = use_graphics ? 2 : 0; /* GRAPHICS_ADAM_BOLT : GRAPHICS_NONE (main.cpp) */
+    ANGBAND_GRAF = grafs[web_tileset];
+    arg_bigtile = use_graphics;
+}
+
+/* music.cfg (preloaded, only the shipped tracks) read once the game data exists */
+static void web_init_music()
+{
+    static auto done = false;
+    if (!done) {
+        done = true;
+        unix_music::init_music(path_build(ANGBAND_DIR_XTRA, "music"));
+    }
 }
 
 /* The page's Tiles button, applied at the command prompt */
-static void web_switch_graphics(bool on)
+static void web_switch_graphics(int set)
 {
     auto *old = game_term;
-    web_graphics(on);
+    web_graphics(set);
     term_activate(&web_term[0]);
     term_resize(game_term->wid, game_term->hgt); /* takes arg_bigtile */
     reset_visuals(p_ptr);
@@ -442,7 +476,7 @@ errr init_web(int argc, char **argv)
     web_react();
 
     /* Tiles unless the page says text */
-    web_graphics(js_tiles_wanted() != 0);
+    web_graphics(js_tiles_wanted());
     use_bigtile = arg_bigtile;
 
     for (auto i = 0; i < WEB_TERMS; i++) {

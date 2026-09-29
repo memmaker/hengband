@@ -9,8 +9,15 @@ OUT=web/dist OBJ=web/obj
 rm -rf "$OUT" web/stage && mkdir -p "$OUT" web/stage/lib "$OBJ"
 
 # Music: Hengband's own tracks (lib/xtra submodule, CC0 / CC BY, see
-# lib/xtra/music/readme.txt), town + dungeon low/med/high as music.cfg
-mkdir -p "$OUT/music" && cp lib/xtra/music/readme.txt lib/xtra/music/town[1-5].mp3 lib/xtra/music/dun_*[1-5].mp3 "$OUT/music/"
+# lib/xtra/music/readme.txt): town, field (wilderness by level), wild (travel
+# map), dungeon low/med/high.  The game's scene table (unix-music.cpp) picks
+# from upstream's music.cfg; the preload gets music.cfg + an empty file per
+# shipped track, so its own "file exists" check skips the scenes we do not
+# ship (as natively), and the page plays dist/music/<file>
+MUSIC="town[1-5].mp3 field_*[1-3].mp3 wild.mp3 dun_*[1-5].mp3"
+mkdir -p "$OUT/music" web/stage/lib/xtra/music && cp lib/xtra/music/readme.txt "$OUT/music/"
+cp lib/xtra/music/music.cfg web/stage/lib/xtra/music/
+(cd lib/xtra/music && cp $MUSIC "../../../$OUT/music/" && for f in $MUSIC; do : > "../../../web/stage/lib/xtra/music/$f"; done)
 
 # Game files (English build: the *_j / j* files stay in, they are small)
 for d in edit file help pref; do cp -R lib/$d web/stage/lib/; done
@@ -43,7 +50,7 @@ em++ -O2 -fexceptions $OBJ/*.o -o "$OUT/hengband-core.js" \
 	-sFORCE_FILESYSTEM -lidbfs.js -sENVIRONMENT=web \
 	--preload-file web/stage/lib@/hengband/lib
 
-cp web/index.html web/hengband.js web/tiles.webp "$OUT/"
+cp web/index.html web/hengband.js web/tiles.webp web/tiles-8x8.webp web/tiles-shb.webp "$OUT/"
 # Text fonts: the index page's fonts/ (served at ../fonts/ next to the games)
 FONTS=${FONTS:-$HOME/Games/roguelikes-index/fonts}
 (ls "$FONTS"/*.woff 2>/dev/null | sed 's|.*/||; s/\.woff$//') | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))' > "$OUT/fonts.json"

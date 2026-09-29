@@ -3,3 +3,14 @@ Hengband, graf-new.prf), 512x1072, 32 x 67 tiles. Made from
 FrogComposband lib/xtra/graf/16x16.bmp + mask.bmp (mask = alpha), lossless.
 Tiles by Adam Bolt; pref file by Robert Ruehlmann; Hengband ids upstream.
 Stand-ins for the gaps: lib/pref/graf-ab.prf (web/mkgraf-ab.py).
+
+tiles-8x8.webp: Hengband's own 8x8 set, lib/xtra/graf/8x8.bmp of the
+hengband.xtra submodule (= the 3.0.2.4-Beta release zip; multilockon123's
+update of the old 8x8 tiles, 512x792, opaque, grey (48,48,48) = unused),
+graf-xxx.prf ("old" graphics). Stand-ins: lib/pref/graf-8x8.prf
+(python3 web/mkgraf-ab.py 8x8).
+
+tiles-shb.webp: Shockbolt 64x64 (Raymond Gaustadnes; Angband 4.2
+lib/tiles/shockbolt/64x64.png via ~/Games/tactical-angband, same file as
+FrogComposband's web/tiles.webp), 8192x2048, lossless. Mapping and stand-ins:
+lib/pref/graf-shb.prf (python3 web/mkgraf-shb.py).

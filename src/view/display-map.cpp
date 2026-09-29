@@ -15,6 +15,7 @@
 #include "system/monrace/monrace-list.h"
 #include "system/monster-entity.h"
 #include "system/player-type-definition.h"
+#include "system/system-variables.h"
 #include "system/terrain/terrain-definition.h"
 #include "system/terrain/terrain-list.h"
 #include "timed-effect/timed-effects.h"
@@ -217,6 +218,12 @@ DisplaySymbolPair map_info(PlayerType *player_ptr, const Pos2D &pos)
     }
 
     DisplaySymbolPair symbol_pair(symbol_config, symbol_config);
+#ifdef USE_WEB
+    /* RVIP web tiles: Shockbolt's trees and bushes are cut-outs, grass under them */
+    if (use_graphics && (ANGBAND_GRAF == "shb") && terrain_mimic_ptr->flags.has(TerrainCharacteristics::PLANT)) {
+        symbol_pair.symbol_background = terrains.get_terrain(TerrainTag::GRASS).symbol_configs.at(F_LIT_STANDARD);
+    }
+#endif
     const auto is_hallucinated = player_ptr->effects()->hallucination().is_hallucinated();
     if (is_hallucinated && one_in_(256)) {
         symbol_pair.symbol_foreground = image_random();

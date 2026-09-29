@@ -48,6 +48,11 @@
 #include <range/v3/all.hpp>
 #include <simpleini/SimpleIni.h>
 #include <spawn.h>
+#ifdef USE_WEB
+#include <emscripten.h>
+/* Web port: the page plays the file (web/hengband.js); "" stops it */
+EM_JS(void, web_music_play, (const char *file), { Module.qb.music(UTF8ToString(file)); });
+#endif
 #include <string>
 #include <sys/types.h>
 #include <tl/optional.hpp>
@@ -201,6 +206,13 @@ bool is_music_player_exist()
  */
 void stop_music()
 {
+#ifdef USE_WEB
+    web_music_play("");
+    current_music_type = TERM_XTRA_MUSIC_MUTE;
+    current_music_id = 0;
+    current_music_path = "";
+    return;
+#endif
     auto status = 0;
     if (!is_music_player_exist()) {
         return;
@@ -247,6 +259,10 @@ bool play_music(int type, int val)
     current_music_type = type;
     current_music_id = val;
     current_music_path = path_music;
+#ifdef USE_WEB
+    web_music_play(filename->data());
+    return true;
+#endif
 
     // kill the player when change music
     if (music_player_pid) {
