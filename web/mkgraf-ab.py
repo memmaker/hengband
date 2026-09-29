@@ -14,8 +14,8 @@ set, written to lib/pref/graf-ab.prf (read at the end of graf-new.prf):
   upstream a text `x`) = an empty cell of the sheet (black).
 
 Sets:
-  python3 web/mkgraf-ab.py      Adam Bolt 16x16 (FrogComposband 16x16.bmp, mask.bmp
-                                as alpha, web/tiles.webp): graf-new.prf -> graf-ab.prf
+  python3 web/mkgraf-ab.py      Adam Bolt 16x16 (heng-graf-16x16.zip 16x16.bmp,
+                                mask.bmp as alpha, web/tiles.webp): graf-new.prf -> graf-ab.prf
   python3 web/mkgraf-ab.py 8x8  Hengband's own 8x8 set (lib/xtra/graf/8x8.bmp,
                                 multilockon123's update, opaque; web/tiles-8x8.webp):
                                 graf-xxx.prf -> graf-8x8.prf (read after graf-xxx.prf,

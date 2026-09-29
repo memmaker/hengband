@@ -38,7 +38,7 @@ WEB = '''<ul>
 <li><strong>Zoom:</strong> <em>A−</em> / <em>A+</em> on the Map title bar (shown on hover) change the size of the map tiles. Hover over a small window's title to show its <em>A−</em> / <em>A+</em> buttons, which change its text size.</li>
 <li><strong>Rename a window</strong> by clicking its title, typing a new name and pressing <kbd>Enter</kbd> (<kbd>Esc</kbd> cancels, an empty name restores the default).</li>
 <li><strong>Keys:</strong> arrow keys, the numeric keypad or <kbd>1</kbd>–<kbd>9</kbd> move you; <kbd>Shift</kbd> + direction runs. Hengband has no mouse support here.</li>
-<li><strong>Tiles</strong> switches between Adam Bolt's 16x16 tiles and text. <strong>Sound</strong> and <strong>Music</strong> are off by default; Music plays Hengband's own town music on the surface and dungeon music below (calmer tracks shallow, darker ones from level 40 and 80).</li>
+<li><strong>Tiles</strong> cycles the tile sets: None (text), Adam Bolt 16x16 (Hengband's release sheet), Hengband's own 8x8 and Shockbolt 64x64. Your choice is kept. <strong>Sound</strong> and <strong>Music</strong> are off by default; Music plays Hengband's own town music on the surface and dungeon music below (calmer tracks shallow, darker ones from level 40 and 80).</li>
 <li>Browsers keep a few shortcuts for themselves (<kbd>Ctrl+W</kbd>, <kbd>Ctrl+T</kbd>, <kbd>Ctrl+N</kbd>, and <kbd>Cmd</kbd> shortcuts on a Mac), so those never reach the game.</li>
 <li>If the game ever crashes, a message appears at the top; reload the page to continue from your last save.</li>
 </ul>'''

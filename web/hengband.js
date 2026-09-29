@@ -8,7 +8,7 @@
 	/* Tile sets (one set per choice, never mixed); index = the game's set number (main-web.cpp web_graphics) */
 	var SETS = [
 		{ id: 'none', name: 'None' },
-		{ id: 'ab', name: 'Adam Bolt', src: 'tiles.webp', tile: 16 },        /* FrogComposband 16x16.bmp + graf-ab stand-ins */
+		{ id: 'ab', name: 'Adam Bolt', src: 'tiles.webp', tile: 16 },        /* heng-graf-16x16.zip 16x16.bmp + graf-ab stand-ins */
 		{ id: '8x8', name: 'Hengband 8x8', src: 'tiles-8x8.webp', tile: 8 },  /* Hengband's own lib/xtra/graf/8x8.bmp + graf-8x8 */
 		{ id: 'shb', name: 'Shockbolt', src: 'tiles-shb.webp', tile: 64 }    /* Angband 4.2 Shockbolt + graf-shb */
 	];

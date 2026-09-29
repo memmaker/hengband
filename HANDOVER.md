@@ -89,12 +89,9 @@
   monsters 930/1416, base items 599/642, terrains 100/189, by id from the
   `*Definitions.jsonc` files). Below 95%. Pref lines: `R:<monrace id>`,
   `K:<baseitem id>` (not tval:sval), `F:<terrain id>[:LIT]`.
-- Open problems: sub-windows get the wrong content (inventory in
-  Messages, messages in Inventory: window flags for the web terms, stage 5).
-  Once after random keys the map was drawn a few rows too low until Ctrl-R
-  (a centred full-screen menu's offset left over; not reproduced, watch in
-  stage 5). Music (`music/new_town.ogg` copied from Quickband like Frog) is a
-  placeholder; Hengband has its own `lib/xtra/music/*.mp3` (stage 6).
+- Open problems: once after random keys the map was drawn a few rows too
+  low until Ctrl-R (a centred full-screen menu's offset left over; not
+  reproduced since). (Sub-window content: fixed in stage 5; music: stage 6.)
 
 ### Next: stage 2 (explore + stairs)
 - Copy Frog's stage-2 code (end of `~/Games/frogcomposband/src/cmd2.c`:
@@ -297,14 +294,13 @@
   lets the index wrap to 255, which looks like AF_BIGTILE2); `d894bd0b9`
   `cmd-action/cmd-racial.cpp` `U` `/` + letter redrew the list at page -1
   (`power_desc[-15]`). Then clean (seeds 22, 24-27). Build deleted.
-- Open problems: the web prompt line (a DOM overlay, `rvip-wm.js`) wraps
-  and covers the first rows of the `i`/`e` list (stage 5 layout); the
-  reopened list hides the action's message (messages window / `^P`); the
+- Open problems (prompt-line overlap and sub-window content fixed in
+  stage 5): the reopened list hides the action's message (messages window / `^P`); the
   action menu box sits at the left over the side panel and can cover the
   list's labels on a narrow term; every item prompt does not get a cursor
   (only prompts of commands picked from the Enter menu, the game's own
   `use_menu` mode); Tab/^I, ^J, ^M in the list are Enter/examine keys,
-  not commands; the sub-windows still show the wrong content (stage 1).
+  not commands.
 
 ### Next: stage 4 (tiles)
 - **Adam Bolt 16x16, the user's explicit choice** (the 95% rule is waived
@@ -321,9 +317,9 @@
 
 ### Stage 4 (tiles): done 2026-09-26
 - **Tile set: Adam Bolt 16x16** (the user's choice; one set, 95% rule
-  waived). Sheet `web/tiles.webp` (512x1072, lossless, 165 kB, committed;
-  credit in `web/tiles.txt`) = FrogComposband `lib/xtra/graf/16x16.bmp`
-  with `mask.bmp` as alpha (mask 255 = transparent). `web/build.sh` copies
+  waived). Sheet `web/tiles.webp` was FrogComposband's 512x1072
+  `16x16.bmp` at this stage; since 2026-09-29 it is Hengband's own release
+  sheet (1024x1072, see "Tile set choice" below). `web/build.sh` copies
   it to `web/dist`. Never in Hengband's git (`lib/xtra` has only 8x8).
 - **Prefs**: upstream `lib/pref/graf-new.prf` is already keyed by
   Hengband 3.x ids (`R:`/`K:`/`F:`; checked against the JSON `"en"`
@@ -373,7 +369,8 @@
   Test IDBFS databases (`/hengband/lib/*`) deleted.
 - Native ASan: skipped (native build is curses `USE_GCU`, no graphics;
   the change is web-only code in `main-web.cpp` + prefs).
-- Open problems: 808 stand-ins (Hengband-only monsters share family
+- Open problems: stand-ins (702 since the release sheet, see "Tile set
+  choice" below; Hengband-only monsters share family
   tiles; mimic monsters look like items); unknown-but-mapped grids (`x` in
   text mode) are black in tiles; on a pane narrower than 80 grid cells ×
   tile the map canvas is scaled down by CSS (smooth, not nearest), e.g.
@@ -383,13 +380,13 @@
 ### Next: stage 5 (web page)
 - Sub-windows show the wrong content (inventory in Messages, messages in
   Inventory): add a window flags table in `init_web()` like Frog's
-  `web_window_flags[]` (W4) for the 6 web terms.
+  `web_window_flags[]` for the 6 web terms (RVIP.md 5.9).
 - The page prompt line (`RvipWM.prompt`) wraps over the first rows of the
   `i`/`e` list; the layout file (sizes, Tiles on/off already in `L.text`).
 - Game end: `hook_quit` → `js_quit` shows "Hengband has ended" + Play
   again; check the death path (tombstone, "Last words" prompt loops with
   "Are you sure?" until `y`).
-- **Temp floor files prompt (W5)**: on reload after a save in the
+- **Temp floor files prompt** (RVIP.md 5.10): on reload after a save in the
   dungeon, "If the temporary files are garbage ... Do you delete the old
   temporary files? [y/n]" appears; `n` quits the game ("Aborted."). Answer
   it in the web build (as Frog did) or keep the floor files in IDBFS.
@@ -508,10 +505,9 @@
   in town → `music/town5.mp3` 200; Sound on (real click) → `E a` →
   `sound/eat2.wav` 200; reload → both still on; no console errors. IDBFS
   `/hengband/lib/*` deleted. No C++ change, no ASan run.
-- Open problems: dungeon music groups not heard in the browser (same
-  code path, only the group switch is new); ~45 MB music goes to the
-  server (only the played track downloads); wilderness plays town music
-  (upstream has field tracks, not copied).
+- Open problems: the music goes to the server in full (only the played
+  track downloads). (Dungeon groups heard and field/wild tracks added on
+  2026-09-29, see the last section.)
 
 ### Next: stage 7 (publish)
 - README: upstream hengband/hengband `master` @ `bf1054199`
@@ -528,7 +524,7 @@
   author/year, image 384x160 from the Adam Bolt sheet (`web/tiles.webp`);
   Zangband `3ec7ae8` / FrogComposband `e479d7e` commits as pattern; og
   block by hand in `web/index.html`; `deploy.sh` after the orchestrator
-  creates the repo; W2 row in RVIP.md.
+  creates the repo; Hengband row in RVIP.md part 3 (worked examples).
 
 ### Stage 7 — publish (done) 2026-09-26
 - **Live**: https://ruzzoli.de/roguelikes/hengband/ (deployed with
@@ -558,8 +554,8 @@
   links 200); no console errors; `og:image` served. Test IDBFS
   `/hengband/lib/{apex,bone,save,user}` deleted from a plain page (none
   existed before).
-- Open problems: stage 5/6 ones remain (dungeon music groups unheard,
-  quick-start message carry-over, Character window page 1 only).
+- Open problems: the stage 5 ones remain (quick-start message carry-over,
+  Character window page 1 only).
 
 ### Next: stage 8 (shrine)
 - Manual/help sources: `lib/help/*.txt` (English: `general`, `birth`,
@@ -662,7 +658,8 @@
   `drawSet` changes when the game takes the switch at a command prompt).
 - **Coverage** (`python3 web/tile-coverage.py ab|8x8|shb`, of 2247
   monsters+base items+terrains; real / stand-ins):
-  Adam Bolt 2246 = 100.0%: real 1435 (63.9%), stand-ins 811 (graf-ab.prf);
+  Adam Bolt 2246 = 100.0%: real 1544 (68.7%: monsters 898, items 592,
+  terrains 54), stand-ins 702 (graf-ab.prf; release sheet, below);
   Hengband 8x8 2247 = 100%: real 1627 (72.4%: monsters 928, items 599,
   terrains 100), stand-ins 620 (`graf-8x8.prf`, `python3 web/mkgraf-ab.py
   8x8`); Shockbolt 2246 = 100.0%: real 1183 (52.6%: monsters 464 by name,
@@ -681,8 +678,8 @@
   addresses → 1544 real tiles with graf-new.prf (Frog's 512-wide sheet:
   1435; 357 graf-new entries point past column 31). No 32x32 sheet
   (GRAPHICS_HENGBAND, `graf-ne2.prf`, `32X32.BMP` in main-win) was ever
-  released; the 8x8 in that zip is the older 256-wide version. Option not
-  taken: swap the Adam Bolt slot's sheet to the release 16x16 (+109 real).
+  released; the 8x8 in that zip is the older 256-wide version. Now used
+  for the Adam Bolt slot (next section).
 - 8x8 is opaque (no mask), grey (48,48,48) = unused cell (both scripts treat
   a uniform grey cell as no tile). Shockbolt plants get a grass background
   (`display-map.cpp` `map_info()`, `USE_WEB`, `$GRAF` shb). Sheets:
@@ -706,3 +703,50 @@
   Shockbolt, Ctrl-S, reload: restored in the cave with Shockbolt, only
   `tiles-shb.webp` fetched. No console errors. IDBFS `/hengband/lib/*`
   deleted from a plain page.
+
+### Adam Bolt slot = Hengband's release sheet; 32x32 search (2026-09-29)
+- **Sheet**: `web/tiles.webp` = `16x16.bmp` + `mask.bmp` of release asset
+  `heng-graf-16x16.zip` (tag 3.0.1.29-Beta; hengband.github.io/download.html
+  links it under 3.0.2.4-Beta, which 404s), 1024x1072 (64 x 67), mask
+  white = transparent, lossless WebP 251 kB. Same set id `ab` / name "Adam
+  Bolt", so saved layouts keep working. Columns 32-63 rows 0-5 hold 191
+  grey-circle placeholder cells; no graf-new entry points at one.
+- **Coverage** (`python3 web/tile-coverage.py ab`): 2246/2247 = 100.0%,
+  real 1544 (68.7%: monsters 898/1416, items 592/642, terrains 54/189),
+  stand-ins 702 (518 monsters, 50 items, 134 terrains; `python3
+  web/mkgraf-ab.py`). Was 1435 real / 811 stand-ins with Frog's copy.
+- **32x32: none exists.** Looked at: all 123 GitHub releases' assets
+  (only the game zips, `hengband-2.2.1r2.zip` and `heng-graf-16x16.zip`,
+  whose 8x8 is the old 256-wide one); hengband.github.io (download page +
+  repo tree), hengband/web; hengband.xtra history (only `graf/8x8.bmp`);
+  main repo history (never a `32X32.BMP`/`mask32.bmp`; `graf-ne2.prf` and
+  main-win's `GRAPHICS_HENGBAND` "32X32.BMP" from deskull 2014, `7cc16ab6f`
+  / `aee8af371`, expect a sheet that was never committed or released);
+  OSDN/sourceforge.jp file pages (dead now; Wayback CDX of
+  `osdn.net/projects/hengband/downloads` and `osdn.net/dl/hengband`: 44
+  archived file names, only graphics file is `heng-graf-16x16`);
+  sourceforge.net/projects/hengband (404).
+- Credits: `web/tiles.txt`, Help (`make-help.py` Tiles line; Docs
+  `build-docs.py` facts, In the browser, Credits: all three sets), shrine.
+- Tested (own tab, 127.0.0.1:8798, fresh origin): birth → Outpost with
+  Adam Bolt (`tiles.webp` loaded), Yeek cave L1; each of None / Adam Bolt
+  / Hengband 8x8 / Shockbolt drawn in the cave and in town; 8x8 → reload
+  → 8x8 (only `tiles-8x8.webp` fetched); Adam Bolt → reload → Adam Bolt
+  (`"tiles":"ab"`, only `tiles.webp`). No console errors. IDBFS
+  `/hengband/lib/*` deleted from a plain page.
+
+## Open problems (current)
+- Stand-ins: Adam Bolt 702, 8x8 620, Shockbolt 1063 (Hengband-only
+  monsters share family tiles; mimic monsters look like items).
+  Unknown-but-mapped grids (`x` in text) are black in tiles.
+- Killer PNGs (roguelikes-index `killers/make.py hengband()`) were cut
+  from the old 512-wide `tiles.webp`; rerun to pick up the extra columns.
+- Explore (stage 2): stops on each "You see ..." over a known item, a
+  visible unreachable monster blocks it, rubble message stops it once, no
+  explore key in the roguelike keyset.
+- Item menus (stage 3): reopened list hides the action's message; action
+  box can cover labels on a narrow term; Tab/^I, ^J, ^M are list keys.
+- Windows (stage 5): quick start shows the dead character's messages;
+  Character window shows page 1 only; Recall needs a look/target.
+- Rare map offset after a centred full-screen menu (stage 1, not seen since).
+- Music: all shipped tracks go to the server (only the played one downloads).
